@@ -1,5 +1,6 @@
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -14,20 +15,21 @@ import org.w3c.dom.Node;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 
-import java.io.File;
 
 class Migi
 {
 	static String mFilename = "";
 	static String mMigrationPath = "";
 	static String [] mArgs;
-	static byte [] mBytes;
+	static byte [] mFileBytes;
 	static String mFileID = "RAD";
 	static Integer mFileIDVersion = 0;
 	static Document docXML;
 
 	private static HashMap<Integer, String> mColumnSizes = new HashMap<Integer, String>();
+	private static HashMap<Integer, String> mCurrentBuffer = new HashMap<Integer, byte []>();
 
+	public static final Integer DEFAULT_HEADER_SIZE = 8;
 	public static final String ANSI_RESET = "\u001B[0m";
 	public static final String ANSI_GREEN = "\u001B[32m";
 
@@ -59,12 +61,12 @@ class Migi
 		processBinFile();
 		processMigration();
 
-		migrate();
+		migrateForward();
 
 		migiComplainAndExit("");
 	}
 
-	private static void migrate ()
+	private static void migrateForward ()
 	{
 		return;
 	}
@@ -74,12 +76,12 @@ class Migi
 		try
 		{
 			Path path = Paths.get(mFilename);
-			mBytes = Files.readAllBytes(path);
+			mFileBytes = Files.readAllBytes(path);
 
 			// Get fileID from bin file and save it for XML processing later.
-			byte [] bytesFileID = Arrays.copyOfRange(mBytes, 0, 3);
+			byte [] bytesFileID = Arrays.copyOfRange(mFileBytes, 0, 3);
 			mFileID = new String(bytesFileID, "ASCII");
-			mFileIDVersion = (int)mBytes[3];
+			mFileIDVersion = (int)mFileBytes[3];
 
 		}
 		catch (FileNotFoundException e) { e.printStackTrace(); }
@@ -203,6 +205,59 @@ class Migi
 			}
 		}
 		catch (Exception e) { e.printStackTrace(); }
+	}
+
+	private static void divideFileByCurrentMigration ()
+	{
+		try
+		{
+			initSizesColumns();
+			NodeList nListMigrations = docXML.getElementsByTagName(mFileID);
+			Node nCurrentMigration = nList.item(mFileIDVersion);
+			NodeList listColumns = ((Element)nCurrentMigration).getElementsByTagName("col");
+
+			Integer offset = initCurrentBufferHeader();
+
+
+			for(int i = 0; i < listColumns.getLength(); i++)
+			{
+
+				// TODO
+                // figure size of column here, based on everything -----------------------------------------------------
+				Node column = listColumns.item(i);
+				NamedNodeMap mapAttrs = column.getAttributes();
+				Node nColumnSize = mapAttrs.getNamedItem("size");
+				String columnSize = "(no size change)";
+
+				if(nColumnSize != null)
+					columnSize = nColumnSize.getTextContent();
+
+				System.out.println("  # bytes " + columnSize + " = " + column.getTextContent());
+				// figure size of column here, based on everything------------------------------------------------------
+
+
+				int headerOffsetIndex = 1;
+				int latestColumnSize = mColumnSizes[i] || something_else; // figure size of column here, based on everything
+
+				byte [] columnOfBytes = Arrays.copyOfRange(mFileBytes, offset, latestColumnSize);
+				mCurrentBuffer.put((i+headerOffsetIndex), columnOfBytes);
+
+				// mFileID = new String(bytesFileID, "ASCII");
+				// mFileIDVersion = (int)mFileBytes[3];
+			}
+
+		}
+		catch (Exception e) { e.printStackTrace(); }
+	}
+
+	private static Integer initCurrentBufferHeader ()
+	{
+		mCurrentBuffer.clear();
+
+		byte [] bytesFileID = Arrays.copyOfRange(mFileBytes, 0, DEFAULT_HEADER_SIZE);
+		mCurrentBuffer.put(i, bytesFileID);
+
+		return DEFAULT_HEADER_SIZE;
 	}
 
 	private static Node firstMigrationNode () {
