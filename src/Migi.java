@@ -30,21 +30,21 @@ class Migi
 	static Integer mFileIDVersion = 0;
 	static Document docXML;
 
-	private static HashMap<Integer, String> mColumnSizes = new HashMap<Integer, String>();
-	private static HashMap<String, Integer> mColumnIDs = new HashMap<String, Integer>();
-	private static HashMap<String, Integer> mColumnIndices = new HashMap<String, Integer>();
+	private static HashMap<Integer, String> mXMLCurrentMigrationColumnSizes = new HashMap<Integer, String>();
+	private static HashMap<String, Integer> mXMLCurrentMigrationColumnIDs = new HashMap<String, Integer>();
+	private static HashMap<String, Integer> mXMLCurrentMigrationColumnIndices = new HashMap<String, Integer>();
 	
 	private static HashMap<Integer,byte[]> mCurrentBufferData = new HashMap<Integer, byte []>();
 	private static HashMap<Integer,String> mCurrentBufferColumnIDs = new HashMap<Integer, String>();
 	private static HashMap<Integer,Integer> mCurrentBufferColumnSizes = new HashMap<Integer, Integer>();
 
-	private static HashMap<Integer,byte[]> mNextBufferData = new HashMap<Integer, byte []>();
-	private static HashMap<Integer,String> mNextBufferColumnIDs = new HashMap<Integer, String>();
-	private static HashMap<Integer,Integer> mNextBufferColumnSizes = new HashMap<Integer, Integer>();
+	private static HashMap<Integer,byte[]> mNewBufferData = new HashMap<Integer, byte []>();
+	private static HashMap<Integer,String> mNewBufferColumnIDs = new HashMap<Integer, String>();
+	private static HashMap<Integer,Integer> mNewBufferColumnSizes = new HashMap<Integer, Integer>();
 
-	private static HashMap<Integer, String> mNextColumnSizes = new HashMap<Integer, String>();
-	private static HashMap<String, Integer> mNextColumnIDs = new HashMap<String, Integer>();
-	private static HashMap<String, Integer> mNextColumnIndices = new HashMap<String, Integer>();
+	private static HashMap<Integer, String> mXMLNextMigrationColumnSizes = new HashMap<Integer, String>();
+	private static HashMap<String, Integer> mXMLNextMigrationColumnIDs = new HashMap<String, Integer>();
+	private static HashMap<String, Integer> mXMLNextMigrationColumnIndices = new HashMap<String, Integer>();
 	
 	private static HashMap<String, Integer> mListOfHandledColumnIDs = new HashMap<String, Integer>();
 
@@ -108,26 +108,122 @@ class Migi
 	{
 		// Get all migrations for file.
 		NodeList nListMigrations = docXML.getElementsByTagName(mFileID);
-
 		Integer currentFileMigrationVersion = mFileIDVersion;
 		Integer latestXMLMigrationVersion = nListMigrations.getLength() +1;
 
 		if(currentFileMigrationVersion >= latestXMLMigrationVersion)
 			return;
-
-		calcNextMigrationColumnAttrs(currentFileMigrationVersion+1);
-		copyCurrentBufferDataIntoNextBufferData();
+		
+		Integer nextFileMigrationVersion = currentFileMigrationVersion+1;
+		calcNextMigrationColumnAttrs(nextFileMigrationVersion);
+		
+		copyCurrentHeaderBufferIntoNextHeaderBuffer();
 
 		// Start at current version and migrate forwards
 		for(int m = currentFileMigrationVersion-1; m < (latestXMLMigrationVersion-1); ++m)
 		{
 			System.out.println("Running Migration: v" + (m+1));
+			/*
+			Node nCurrentMigration = nListMigrations.item(currentFileMigrationVersion);
+			NodeList nCurrentMigrationListColumns = ((Element)nCurrentMigration).getElementsByTagName("col");
+			*/
+			Node nNextMigration = nListMigrations.item(nextFileMigrationVersion);
+			NodeList nNextMigrationListColumns = ((Element)nNextMigration).getElementsByTagName("col");
+			
+			for(int nextMigrationColumnIndex = 0; nextMigrationColumnIndex < nNextMigrationListColumns.getLength(); nextMigrationColumnIndex++)
+			{
+				String nextMigrationColumnSize = calcColumnSizeFromNode(nNextMigrationListColumns.item(nextMigrationColumnIndex));
+				String nextMigrationColumnID   = calcColumnIDFromNode(nNextMigrationListColumns.item(nextMigrationColumnIndex), m, nextMigrationColumnIndex);
+				
+				// if column exists in previous migration
+				if( (mXMLCurrentMigrationColumnIDs.containsValue(nextMigrationColumnID)) )
+				{
+					// get previous migration column and all data associated.
+					Integer currentMigrationColumnIndex = mXMLCurrentMigrationColumnIndices.get(nextMigrationColumnID);
+					Integer currentMigrationColumnSize  = mCurrentBufferColumnSizes.get(currentMigrationColumnIndex);
+					String  currentMigrationColumnID    = mCurrentBufferColumnIDs.get(currentMigrationColumnIndex);
+					
+					//-----------------------------------------------------------
+					// Handling size changes to column // aka has size changed?
+					//-----------------------------------------------------------
+					Integer latestColumnSize;
+					
+					// has size changed?
+					if( currentMigrationColumnSize != Integer.parseInt(nextMigrationColumnSize) )
+						latestColumnSize = Integer.parseInt(nextMigrationColumnSize);
+					else
+						latestColumnSize = currentMigrationColumnSize;
+					
+					// allocate memory with the new size (if anything has changed)
+					byte [] nextColumnOfBytes = new byte[latestColumnSize];
+					byte [] currentColumnOfBytes = mCurrentBufferData.get(currentMigrationColumnIndex);
+					System.arraycopy(currentColumnOfBytes, 0, nextColumnOfBytes, 0, latestColumnSize);
 
-			// Go through every column on either side of the two migrations
-			// and add/delete/modify as needed
+					mNewBufferData.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextColumnOfBytes);
+					//-----------------------------------------------------------
+					// end
+					//-----------------------------------------------------------
+					
+					
+					//-----------------------------------------------------------
+					// has the file been 
+					//-----------------------------------------------------------
+					
+					// todo
+					
+					//-----------------------------------------------------------
+					// end
+					//-----------------------------------------------------------
+					
+					
+					mNewBufferColumnIDs.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), columnID);
+					mNewBufferColumnSizes.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), latestColumnSize);
+					
+					
+					byte [] columnOfBytes = new byte[maxSizeOfBytes];
+					
+					mNewBufferData.put((c+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
+					mNewBufferColumnIDs.put((c+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnID);
+					mNewBufferColumnSizes.put((c+DEFAULT_HEADER_SIZE_INDEX), Integer.parseInt(nextMigrationColumnSize));
+						
+					// is it modified?
+					// Check Size Changes
+					// Check Values passed in. -> Convert Values if Necessary
+					
+					// is it simply a carry over?
+					// if none of the above, copy data over:
+					// { copy }
+				} 
+				else // this is a new column
+				{
+					
+					// Demand that we require a column size for new columns introduced in the schema.
+					if( new String("(no size change)").equals(nextMigrationColumnSize) )
+						migiComplainAndExit("Error - Cannot create new column <col> tag without 'size=' attribute.\nProblem migration: " + (m+1) + "\nProblem column: " + (c+1) + "\nProblem id: " + nextMigrationColumnID);
 
+					// Has it been assigned any values or data?
+					// if no, the zerofill content.
+					// TODO: add filler. ^^^^^^^^^.
+					byte [] columnOfBytes = {0,0};
+					
+					mNewBufferData.put((c+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
+					mNewBufferColumnIDs.put((c+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnID);
+					mNewBufferColumnSizes.put((c+DEFAULT_HEADER_SIZE_INDEX), Integer.parseInt(nextMigrationColumnSize));
+
+					
+				}
+
+				// Set these three everytime.
+				mNewBufferData.put((i+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
+				mNewBufferColumnIDs.put((i+DEFAULT_HEADER_SIZE_INDEX), columnID);
+				mNewBufferColumnSizes.put((i+DEFAULT_HEADER_SIZE_INDEX), latestColumnSize);
+
+			}
+			
+			
+			/*
 			// for each key do
-			for(HashMap.Entry<String, Integer> entry : mColumnIDs.entrySet())
+			for(HashMap.Entry<String, Integer> entry : mXMLCurrentMigrationColumnIDs.entrySet())
 			{
 				String key = entry.getKey();
 				Integer value = entry.getValue();
@@ -141,7 +237,7 @@ class Migi
 			}
 
 			// for each key do
-			for(HashMap.Entry<String, Integer> entry : mNextColumnIDs.entrySet())
+			for(HashMap.Entry<String, Integer> entry : mXMLNextMigrationColumnIDs.entrySet())
 			{
 				String key = entry.getKey();
 				Integer value = entry.getValue();
@@ -153,9 +249,11 @@ class Migi
 
 				mListOfHandledColumnIDs.put(key, value);
 			}
-
+*/
 			// 2 for loops
 		}
+		
+		
 
 		/*
 		{
@@ -177,62 +275,142 @@ class Migi
 		}*/
 
 	}// 1 -> 2
+	
+	
+
+	private static void handleColumnDeletions( String columnID )
+	{
+		// Delete column if it does not exist in next migration.
+		if( !(mXMLNextMigrationColumnIDs.containsKey(columnID)) )
+		{
+			Integer indexKey = (Integer) getHashMapKeyFromValue(mCurrentBufferColumnIDs, columnID);
+			mNewBufferData.remove(indexKey);
+			mNewBufferColumnIDs.remove(indexKey);
+			mNewBufferColumnSizes.remove(indexKey);
+			
+			reIndexNextBuffers();
+		}
+		else // Column does not exist in future migration, so delete it.
+		{
+			Integer indexKey = (Integer) getHashMapKeyFromValue(mCurrentBufferColumnIDs, columnID);
+			mNewBufferData.remove(indexKey);
+			mNewBufferColumnIDs.remove(indexKey);
+			mNewBufferColumnSizes.remove(indexKey);
+			
+			/*
+			// slide down remainder keys
+			for(int i = indexKey; i<mNewBufferColumnIDs.size()-1; ++i) // TODOssssssssssssssssssssssssss
+			{
+				mNewBufferData.put(i, mNewBufferData.get(i+1));
+				mNewBufferColumnIDs.put(i, mNewBufferColumnIDs.get(i+1));
+				mNewBufferColumnSizes.put(i, mNewBufferColumnSizes.get(i+1));
+			}
+			
+			Integer lastKey = mNewBufferColumnIDs.size();
+			
+			mNewBufferData.remove(lastKey);
+			mNewBufferColumnIDs.remove(lastKey);
+			mNewBufferColumnSizes.remove(lastKey);
+			*/
+			
+			reIndexNextBuffers();
+		}
+	}
 
 	private static void handleColumnMigration( String columnID )
 	{
+		
+		/// can we get a delete and swap performed correctly like intended??
+		/// what is intended?
+		//
+		// For example, if we delete one, we should re-index,
+		// then swap, then re-index,
+		// then reindex.. after everytime, or else you'd get into weird issues..........
+		
+		
+		
+		// That being said:: ALL DELETIONS and ADDITIONS should be done first,
+		// saving swapping for last.
 
 		// Does next migration have column?
-		if(mNextColumnIDs.containsKey(columnID))
+		if(mXMLNextMigrationColumnIDs.containsKey(columnID))
 		{
 			// has column changed position?
-			if(mNextColumnIndices.containsKey(columnID) != mColumnIndices.containsKey(columnID) )
+			if(mXMLNextMigrationColumnIndices.containsKey(columnID) != mXMLCurrentMigrationColumnIndices.containsKey(columnID) )
 			{
-				Integer indexNext = mNextColumnIndices.get(columnID);
-				Integer indexCurrent = mColumnIndices.get(columnID);
+				Integer indexNext = mXMLNextMigrationColumnIndices.get(columnID);
+				Integer indexCurrent = mXMLCurrentMigrationColumnIndices.get(columnID);
 				
 				// backup current
-				byte [] backupData = mNextBufferData.get(indexCurrent);
-				String backupID    = mNextBufferColumnIDs.get(indexCurrent);
-				Integer backupSize = mNextBufferColumnSizes.get(indexCurrent);
+				byte [] backupData = mNewBufferData.get(indexCurrent);
+				String backupID    = mNewBufferColumnIDs.get(indexCurrent);
+				Integer backupSize = mNewBufferColumnSizes.get(indexCurrent);
 				
 				// swap //
 				// overwrite current //
-				mNextBufferData.put(indexCurrent, mCurrentBufferData.get(indexNext));
-				mNextBufferColumnIDs.put(indexCurrent, mCurrentBufferColumnIDs.get(indexNext));
-				mNextBufferColumnSizes.put(indexCurrent, mCurrentBufferColumnSizes.get(indexNext));
+				mNewBufferData.put(indexCurrent, mCurrentBufferData.get(indexNext));
+				mNewBufferColumnIDs.put(indexCurrent, mCurrentBufferColumnIDs.get(indexNext));
+				mNewBufferColumnSizes.put(indexCurrent, mCurrentBufferColumnSizes.get(indexNext));
 				
 				// overwrite next //
-				mNextBufferData.put(indexNext, mCurrentBufferData.get(backupData));
-				mNextBufferColumnIDs.put(indexNext, mCurrentBufferColumnIDs.get(backupID));
-				mNextBufferColumnSizes.put(indexNext, mCurrentBufferColumnSizes.get(backupSize));
+				mNewBufferData.put(indexNext, mCurrentBufferData.get(backupData));
+				mNewBufferColumnIDs.put(indexNext, mCurrentBufferColumnIDs.get(backupID));
+				mNewBufferColumnSizes.put(indexNext, mCurrentBufferColumnSizes.get(backupSize));
 			}
 			
 		}
 		else // Column does not exist in future migration, so delete it.
 		{
 			Integer indexKey = (Integer) getHashMapKeyFromValue(mCurrentBufferColumnIDs, columnID);
-			mNextBufferData.remove(indexKey);
-			mNextBufferColumnIDs.remove(indexKey);
-			mNextBufferColumnSizes.remove(indexKey);
+			mNewBufferData.remove(indexKey);
+			mNewBufferColumnIDs.remove(indexKey);
+			mNewBufferColumnSizes.remove(indexKey);
+			
+			/*
+			// slide down remainder keys
+			for(int i = indexKey; i<mNewBufferColumnIDs.size()-1; ++i) // TODOssssssssssssssssssssssssss
+			{
+				mNewBufferData.put(i, mNewBufferData.get(i+1));
+				mNewBufferColumnIDs.put(i, mNewBufferColumnIDs.get(i+1));
+				mNewBufferColumnSizes.put(i, mNewBufferColumnSizes.get(i+1));
+			}
+			
+			Integer lastKey = mNewBufferColumnIDs.size();
+			
+			mNewBufferData.remove(lastKey);
+			mNewBufferColumnIDs.remove(lastKey);
+			mNewBufferColumnSizes.remove(lastKey);
+			*/
+			
+			reIndexNextBuffers();
 		}
 	}
 
-
-
-	// copyCurrentBufferDataIntoNextBufferData ()
-	//
-	// We want two copies of the binary file, so that when we are done
-	// migrating we will have one unmodified copy of the data, and
-	// another migrated version.
-	//
-	private static void copyCurrentBufferDataIntoNextBufferData ()
+	private static void reIndexNextBuffers ()
 	{
-		for(int i = 0; i<mCurrentBufferData.size(); ++i)
-		{
-			mNextBufferData.put(i, mCurrentBufferData.get(i));
-			mNextBufferColumnIDs.put(i, mCurrentBufferColumnIDs.get(i));
-			mNextBufferColumnSizes.put(i, mCurrentBufferColumnSizes.get(i));
-		}
+		
+		/*
+		how to handle swapss..to..to.s
+		
+		
+		how to hanlde:
+			Integer indexNext = mXMLNextMigrationColumnIndices.get(columnID);
+			Integer indexCurrent = mXMLCurrentMigrationColumnIndices.get(columnID);
+		
+		*/
+		
+	}
+
+
+	// copyCurrentHeaderBufferIntoNextHeaderBuffer
+	//
+	// Header information is assumed to be stored in the first segment of the enumerable.
+	//
+	private static void copyCurrentHeaderBufferIntoNextHeaderBuffer ()
+	{
+		mNewBufferData.put(0, mCurrentBufferData.get(0));
+		mNewBufferColumnIDs.put(0, mCurrentBufferColumnIDs.get(0));
+		mNewBufferColumnSizes.put(0, mCurrentBufferColumnSizes.get(0));
 	}
 
 	private static void processBinFile () throws IOException
@@ -310,7 +488,7 @@ class Migi
 		// initColumnSizes();
 		//
 		//
-		//  mColumnIDs
+		//  mXMLCurrentMigrationColumnIDs
 		//
 
 		System.out.println("// initColumnSizes();");
@@ -328,22 +506,22 @@ class Migi
 				String columnSize = calcColumnSizeFromNode(columnList.item(c));
 				String columnID   = calcColumnIDFromNode(columnList.item(c), m, c);
 
-				if(mColumnIDs.containsKey(columnID))  {
-					if(mColumnIDs.get(columnID) == m)
+				if(mXMLCurrentMigrationColumnIDs.containsKey(columnID))  {
+					if(mXMLCurrentMigrationColumnIDs.get(columnID) == m)
 						migiComplainAndExit("Error - More than one <col> tag contains the same 'id=' attribute value inside a single migration." + "\nProblem migration: " + (m+1) + "\nProblem column: " + (c+1) + "\nProblem id: " + columnID );
 				}
 
 				// Log the unique columnIDs and which migration version they support.
-				mColumnIDs.put(columnID, m);
-				mColumnIndices.put(columnID, c);
+				mXMLCurrentMigrationColumnIDs.put(columnID, m);
+				mXMLCurrentMigrationColumnIndices.put(columnID, c);
 
 				// Only update sequential sizes if a new size is specified in the migration.
 				if( !(new String("(no size change)").equals(columnSize)) )
-					mColumnSizes.put(c, columnSize);
+					mXMLCurrentMigrationColumnSizes.put(c, columnSize);
 				else if(m == 0) // First migration requires size attributes for all column tags
 					migiComplainAndExit("Error - First migration contains a <col> tag missing a 'size=' attribute.\nProblem column: " + (c+1) );
 
-				System.out.println(mColumnSizes.get(c));
+				System.out.println(mXMLCurrentMigrationColumnSizes.get(c));
 			}
 		}
 	}
@@ -360,17 +538,17 @@ class Migi
 			String columnID   = calcColumnIDFromNode(columnList.item(c), pMigration, c);
 			Integer columnIndex = c;
 			
-			if(mColumnIDs.containsKey(columnID))  {
-				if(mColumnIDs.get(columnID) == pMigration)
+			if(mXMLCurrentMigrationColumnIDs.containsKey(columnID))  {
+				if(mXMLCurrentMigrationColumnIDs.get(columnID) == pMigration)
 					migiComplainAndExit("Error - More than one <col> tag contains the same 'id=' attribute value inside a single migration." + "\nProblem migration: " + (pMigration+1) + "\nProblem column: " + (c+1) + "\nProblem id: " + columnID );
 			}
 
-			mNextColumnIndices.put(columnID, columnIndex);
-			mNextColumnIDs.put(columnID, pMigration);
+			mXMLNextMigrationColumnIndices.put(columnID, columnIndex);
+			mXMLNextMigrationColumnIDs.put(columnID, pMigration);
 
 			// Only update sequential sizes if a new size is specified in the migration.
 			if( !(new String("(no size change)").equals(columnSize) ) )
-				mNextColumnSizes.put(c, columnSize);
+				mXMLNextMigrationColumnSizes.put(c, columnSize);
 		}
 	}
 
@@ -383,10 +561,10 @@ class Migi
 			String columnID = calcColumnIDFromNode(pCurrentListColumns.item(i), mFileIDVersion, i);
 			String columnSize = calcColumnSizeFromNode(pCurrentListColumns.item(i));
 
-			// mColumnSizes will have already been filled and set at this point,
+			// mXMLCurrentMigrationColumnSizes will have already been filled and set at this point,
 			// or thrown an error if no sizes were specified in base migration.
 			if( !(new String("(no size change)").equals(columnSize) ) )
-				columnSize = mColumnSizes.get(i);
+				columnSize = mXMLCurrentMigrationColumnSizes.get(i);
 
 			Integer latestColumnSize = Integer.parseInt(columnSize);
 			byte [] columnOfBytes = new byte[latestColumnSize];
