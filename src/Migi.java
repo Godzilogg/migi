@@ -54,6 +54,13 @@ class Migi
 	public static final String ANSI_GREEN = "\u001B[32m";
 	public static final String HEADER_ID = "!!!___HEADER___!!!"; // TODO: ensure no col id matches this.
 
+	// main ( String [] args )
+	//
+	// The heartbeat of the application, derp, <A>FWFA><#@M4tlkq34lakj lkadslkfja;sldkjfl;awj4e <--- (I can only get away with this on personal projects.)
+	//
+	// To run open up your terminal and cd to the Migi.class directory
+	// and type: java Migi -i "file.fun.bin" -m "C:\MyMigrations\FunMigration.xml"
+	//
 	public static void main ( String [] args )
 	{
 
@@ -95,6 +102,7 @@ class Migi
 		catch (FileNotFoundException e) { e.printStackTrace(); }
 		catch (IOException e) { e.printStackTrace(); }
 		finally {
+			// TODO: we may not have to actually cleanup anything..
 			// cleanupFiles();
 		}
 
@@ -102,8 +110,10 @@ class Migi
 	}
 
 
-
-
+	// migrateForward ()
+	//
+	// Creates a new binary file based on the next migrations specifications.
+	//
 	private static void migrateForward ()
 	{
 		// Get all migrations for file.
@@ -122,7 +132,8 @@ class Migi
 		// Start at current version and migrate forwards
 		for(int m = currentFileMigrationVersion-1; m < (latestXMLMigrationVersion-1); ++m)
 		{
-			System.out.println("Running Migration: v" + (m+1));
+			Integer debugMigrationIndex = nListMigrations.getLength() + m;
+			System.out.println("Running Migration: v" + (debugMigrationIndex+1));
 			/*
 			Node nCurrentMigration = nListMigrations.item(currentFileMigrationVersion);
 			NodeList nCurrentMigrationListColumns = ((Element)nCurrentMigration).getElementsByTagName("col");
@@ -141,7 +152,7 @@ class Migi
 					// get previous migration column and all data associated.
 					Integer currentMigrationColumnIndex = mXMLCurrentMigrationColumnIndices.get(nextMigrationColumnID);
 					Integer currentMigrationColumnSize  = mCurrentBufferColumnSizes.get(currentMigrationColumnIndex);
-					String  currentMigrationColumnID    = mCurrentBufferColumnIDs.get(currentMigrationColumnIndex);
+					// String  currentMigrationColumnID    = mCurrentBufferColumnIDs.get(currentMigrationColumnIndex);
 					
 					//-----------------------------------------------------------
 					// Handling size changes to column // aka has size changed?
@@ -181,13 +192,47 @@ class Migi
 				} 
 				else // this is a new column
 				{
+
 					// Demand that we require a column size for new columns introduced in the schema.
 					if( new String("(no size change)").equals(nextMigrationColumnSize) )
-						migiComplainAndExit("Error - Cannot create new column <col> tag without 'size=' attribute.\nProblem migration: " + (m+1) + "\nProblem column: " + (nextMigrationColumnIndex+1) + "\nProblem id: " + nextMigrationColumnID);
+						migiComplainAndExit("Error - Cannot create new column <col> tag without 'size=' attribute.\nProblem migration: " + debugMigrationIndex + "\nProblem column: " + (nextMigrationColumnIndex+1) + "\nProblem id: " + nextMigrationColumnID);
 
+					
 					//-----------------------------------------------------------
 					// has the column been given a value
 					//-----------------------------------------------------------
+					
+					byte [] columnOfBytes = new byte[Integer.parseInt(nextMigrationColumnSize)];
+					// get <col> !this content! </col>
+					String strContent = nNextMigrationListColumns.item(nextMigrationColumnIndex).getTextContent();
+					
+					if(strContent == null || strContent.isEmpty())
+					{
+						Arrays.fill(columnOfBytes, (byte)0x00);
+					}
+					else
+					{
+						// if content is hex string
+						if(strContent.charAt(0) == '0' && strContent.charAt(1) == 'x')
+						{
+							// remove 0x
+							String strBytes = strContent.substring(2);
+							
+							// convert bytes
+							for(int i = 0; i<columnOfBytes.length; ++i)
+							{
+								columnOfBytes[4 >> 1] = (byte) ( (Character.digit(strBytes.charAt(i),   16) << 4) +
+																  Character.digit(strBytes.charAt(i+1), 16)       );
+							}
+						}
+						// else if()// string is something else.
+						//{
+							// todo
+						//}
+						
+						// columnOfBytes = figureWhatContentIS(strContent);
+					}
+					
 					
 					// TODO: add filler. ^^^^^^^^^.
 					byte [] columnOfBytes = {0,0,0,0};
@@ -470,8 +515,8 @@ class Migi
 } // class Migi //
 
 
-// java Migi -i "file.fun.nes" -m "migrations/"
-// java Migi -i "file.fun.nes" -m "C:\Users\Matthew\Desktop\RAD.xml"
+
+
 
 
 
