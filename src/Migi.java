@@ -204,26 +204,39 @@ class Migi
 					
 					byte [] columnOfBytes = new byte[Integer.parseInt(nextMigrationColumnSize)];
 					// get <col> !this content! </col>
-					String strContent = nNextMigrationListColumns.item(nextMigrationColumnIndex).getTextContent();
+					String strContent = nNextMigrationListColumns.item(nextMigrationColumnIndex).getTextContent().trim();
+
+					System.out.println("ln 209 - Here");
 					
 					if(strContent == null || strContent.isEmpty())
 					{
+						System.out.println("ln 213 - Fill Zero");
 						Arrays.fill(columnOfBytes, (byte)0x00);
 					}
 					else
 					{
+						
+						System.out.println("ln 218 - love " + strContent.charAt(0) + " <sdf> " + strContent.charAt(1));
+						
 						// if content is hex string
 						if(strContent.charAt(0) == '0' && strContent.charAt(1) == 'x')
 						{
+							System.out.println("ln 221 - oxo");
+							
 							// remove 0x
 							String strBytes = strContent.substring(2);
 							
 							// convert bytes
-							for(int i = 0; i<columnOfBytes.length; ++i)
+							for(int i = 0; i<columnOfBytes.length; i+=2)
 							{
-								columnOfBytes[4 >> 1] = (byte) ( (Character.digit(strBytes.charAt(i),   16) << 4) +
+								columnOfBytes[i >> 1] = (byte) ( (Character.digit(strBytes.charAt(i),   16) << 4) +
 																  Character.digit(strBytes.charAt(i+1), 16)       );
+								
 							}
+							
+							byte [] bytesFileIDa = Arrays.copyOfRange(columnOfBytes, 0, 6);
+							// mFileID = new String(bytesFileID, "ASCII");
+		
 						}
 						// else if()// string is something else.
 						//{
@@ -235,7 +248,7 @@ class Migi
 					
 					
 					// TODO: add filler. ^^^^^^^^^.
-					byte [] columnOfBytes = {0,0,0,0};
+					// byte [] columnOfBytes = {0,0,0,0};
 					
 					mNewBufferData.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
 					mNewBufferColumnIDs.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnID);
