@@ -2,6 +2,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.io.File;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -197,47 +199,162 @@ class Migi
 					if( new String("(no size change)").equals(nextMigrationColumnSize) )
 						migiComplainAndExit("Error - Cannot create new column <col> tag without 'size=' attribute.\nProblem migration: " + debugMigrationIndex + "\nProblem column: " + (nextMigrationColumnIndex+1) + "\nProblem id: " + nextMigrationColumnID);
 
-					
 					//-----------------------------------------------------------
 					// has the column been given a value
 					//-----------------------------------------------------------
-					
-					byte [] columnOfBytes = new byte[Integer.parseInt(nextMigrationColumnSize)];
+
+					Integer nextMigrationColumnSizeInt = Integer.parseInt(nextMigrationColumnSize);
+					byte [] columnOfBytes = new byte[nextMigrationColumnSizeInt];
+					Arrays.fill(columnOfBytes, (byte)0x00);
 					// get <col> !this content! </col>
 					String strContent = nNextMigrationListColumns.item(nextMigrationColumnIndex).getTextContent().trim();
 
-					System.out.println("ln 209 - Here");
-					
+					// Has the new column been given a default value?
 					if(strContent == null || strContent.isEmpty())
 					{
-						System.out.println("ln 213 - Fill Zero");
-						Arrays.fill(columnOfBytes, (byte)0x00);
+						// Arrays.fill(columnOfBytes, (byte)0x00);
 					}
 					else
 					{
-						
-						System.out.println("ln 218 - love " + strContent.charAt(0) + " <sdf> " + strContent.charAt(1));
-						
 						// if content is hex string
 						if(strContent.charAt(0) == '0' && strContent.charAt(1) == 'x')
 						{
-							System.out.println("ln 221 - oxo");
-							
 							// remove 0x
 							String strBytes = strContent.substring(2);
+							byte [] convertedBytes = new byte[strBytes.length()];
 							
 							// convert bytes
-							for(int i = 0; i<columnOfBytes.length; i+=2)
+							for(int i = 0; i < strBytes.length(); i+=2)
 							{
-								columnOfBytes[i >> 1] = (byte) ( (Character.digit(strBytes.charAt(i),   16) << 4) +
-																  Character.digit(strBytes.charAt(i+1), 16)       );
-								
+								convertedBytes[i >> 1] = (byte) ( (Character.digit(strBytes.charAt(i),   16) << 4) +
+														 	 	   Character.digit(strBytes.charAt(i+1), 16)       );
 							}
 							
-							byte [] bytesFileIDa = Arrays.copyOfRange(columnOfBytes, 0, 6);
-							// mFileID = new String(bytesFileID, "ASCII");
-		
+							// How many of these bytes can we keep? //
+							Integer validLength;
+							
+							if(columnOfBytes.length >= convertedBytes.length)
+								validLength = convertedBytes.length;
+							else
+								validLength = columnOfBytes.length;
+							
+							System.arraycopy(convertedBytes, 0, columnOfBytes, 0, validLength);
+
+/*
+							String sssss = null;
+							try {
+								sssss = new String(columnOfBytes, "ASCII");
+							} catch (UnsupportedEncodingException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+							System.out.println("v------v");
+							System.out.println(sssss);
+							System.out.println("^sssssed^");
+							*/
 						}
+						// if content is a string literal
+						else if(strContent.charAt(0) == '"' || strContent.charAt(0) == '\'')
+						{
+							// remove " or '
+							String strSubContent = strContent.substring(1, strContent.length()-1).trim();
+							byte [] convertedBytes = new byte[strSubContent.length()];
+							
+							// convert bytes
+							for(int i = 0; i < strSubContent.length(); i++)
+							{
+								convertedBytes[i] = (byte) strSubContent.charAt(i);
+							}
+							
+							// How many of these bytes can we keep? //
+							Integer validLength;
+							
+							if(columnOfBytes.length >= convertedBytes.length)
+								validLength = convertedBytes.length;
+							else
+								validLength = columnOfBytes.length;
+							
+							System.arraycopy(convertedBytes, 0, columnOfBytes, 0, validLength);
+
+/*
+							String sssss = null;
+							try {
+								sssss = new String(columnOfBytes, "ASCII");
+							} catch (UnsupportedEncodingException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+							System.out.println("v------v");
+							System.out.println(sssss);
+							System.out.println("^sssssed^");
+							*/
+							
+						}
+						// if content is a numerical string
+						else if(Character.isDigit(strContent.charAt(1)) && !isFloatingPointString(strContent))
+						{
+							// TODO: if size is 8 then make it a long-long.
+							//		 else 4 is int
+							//       anything_else make it raise an error
+							Integer intContent = Integer.parseInt(strContent);
+							byte [] convertedBytes = ByteBuffer.allocate(4).putInt(intContent).array(); // TODO: .order(ByteOrder.LITTLE_ENDIAN)
+							
+							// How many of these bytes can we keep? //
+							Integer validLength;
+							
+							if(columnOfBytes.length >= convertedBytes.length)
+								validLength = convertedBytes.length;
+							else
+								validLength = columnOfBytes.length;
+							
+							System.arraycopy(convertedBytes, 0, columnOfBytes, 0, validLength);
+
+
+							String sssss = null;
+							try {
+								sssss = new String(columnOfBytes, "ASCII");
+							} catch (UnsupportedEncodingException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+							System.out.println("v------v");
+							System.out.println(sssss);
+							System.out.println("^sssssed^");
+							
+						
+						}
+						// if content is a floating point numerical string
+						else if(isFloatingPointString(strContent))
+						{
+							// TODO: if size is 8 then make it a double.
+							//		 else 4 is float
+							//       anything_else make it raise an error
+							Float floatContent = Float.parseFloat(strContent);
+							byte [] convertedBytes = ByteBuffer.allocate(4).putFloat(floatContent).array(); // TODO: .order(ByteOrder.LITTLE_ENDIAN)
+							
+							// How many of these bytes can we keep? //
+							Integer validLength;
+							
+							if(columnOfBytes.length >= convertedBytes.length)
+								validLength = convertedBytes.length;
+							else
+								validLength = columnOfBytes.length;
+							
+							System.arraycopy(convertedBytes, 0, columnOfBytes, 0, validLength);
+
+
+							String sssss = null;
+							try {
+								sssss = new String(columnOfBytes, "ASCII");
+							} catch (UnsupportedEncodingException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+							System.out.println("v------v");
+							System.out.println(sssss);
+							System.out.println("^sssssed^");
+						}
+						
 						// else if()// string is something else.
 						//{
 							// todo
@@ -261,7 +378,24 @@ class Migi
 		// mNewBufferData.saveAllDataToNewFile, or show comparisions.. TODO:
 		// hjklhkjl
 	}
+	
+	
 
+
+	private static boolean isFloatingPointString(String str) {
+        try {
+            Float.parseFloat(str);
+            Double.parseDouble(str);
+            // if it has a period, we count as floating point, else it is a whole number
+            return (str.indexOf('.') >= 0) ? true : false;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+
+
+	
 	// copyCurrentHeaderBufferIntoNextHeaderBuffer
 	//
 	// Header information is assumed to be stored in the first segment of the enumerable.
@@ -314,8 +448,37 @@ class Migi
 
 		if(nList.getLength() == mFileIDVersion)
 			migiComplainAndExit("Exiting - File is up to date with latest Migration v" + mFileIDVersion);
+		
+		validateXML();
 
 		divideFileByCurrentMigration();
+	}
+	
+	// validateXML ()
+	//
+	// Ensures XML file does not contains unique column IDs per migration.
+	// TODO: Add other validations here
+	//
+	private static void validateXML ()
+	{
+		NodeList nListMigrations = docXML.getElementsByTagName(mFileID);
+
+		for(int m = 0; m < nListMigrations.getLength(); m++)
+		{
+			Node nMigration = nListMigrations.item(m);
+			NodeList columnList = ((Element) nMigration).getElementsByTagName("col");
+			HashMap<String, Integer> columnIDs = new HashMap<String, Integer>();
+
+			for(int c = 0; c < columnList.getLength(); c++)
+			{
+				String columnID = calcColumnIDFromNode(columnList.item(c), m, c);
+				
+				if(columnIDs.get(columnID) == null)
+					columnIDs.put(columnID, c);
+				else
+					migiComplainAndExit("Error - More than one <col> tag contains the same 'id=' attribute value inside a single migration." + "\nProblem migration: " + (m+1) + "\nProblem column: " + (c+1) + "\nProblem id: " + columnID );
+			}
+		}
 	}
 
 	// divideFileByCurrentMigration ()
