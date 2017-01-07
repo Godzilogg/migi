@@ -219,39 +219,7 @@ class Migi
 						// if content is hex string
 						if(strContent.charAt(0) == '0' && strContent.charAt(1) == 'x')
 						{
-							// remove 0x
-							String strBytes = strContent.substring(2);
-							byte [] convertedBytes = new byte[strBytes.length()];
-							
-							// convert bytes
-							for(int i = 0; i < strBytes.length(); i+=2)
-							{
-								convertedBytes[i >> 1] = (byte) ( (Character.digit(strBytes.charAt(i),   16) << 4) +
-														 	 	   Character.digit(strBytes.charAt(i+1), 16)       );
-							}
-							
-							// How many of these bytes can we keep? //
-							Integer validLength;
-							
-							if(columnOfBytes.length >= convertedBytes.length)
-								validLength = convertedBytes.length;
-							else
-								validLength = columnOfBytes.length;
-							
-							System.arraycopy(convertedBytes, 0, columnOfBytes, 0, validLength);
-
-/*
-							String sssss = null;
-							try {
-								sssss = new String(columnOfBytes, "ASCII");
-							} catch (UnsupportedEncodingException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-							System.out.println("v------v");
-							System.out.println(sssss);
-							System.out.println("^sssssed^");
-							*/
+							columnOfBytes = StringToBuffer.convertHexString(strContent, nextMigrationColumnSizeInt);
 						}
 						// if content is a string literal
 						else if(strContent.charAt(0) == '"' || strContent.charAt(0) == '\'')
@@ -354,19 +322,8 @@ class Migi
 							System.out.println(sssss);
 							System.out.println("^sssssed^");
 						}
-						
-						// else if()// string is something else.
-						//{
-							// todo
-						//}
-						
-						// columnOfBytes = figureWhatContentIS(strContent);
 					}
-					
-					
-					// TODO: add filler. ^^^^^^^^^.
-					// byte [] columnOfBytes = {0,0,0,0};
-					
+
 					mNewBufferData.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
 					mNewBufferColumnIDs.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnID);
 					mNewBufferColumnSizes.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), Integer.parseInt(nextMigrationColumnSize));
