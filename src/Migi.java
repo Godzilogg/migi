@@ -52,6 +52,23 @@ class Migi
 	public static final String ANSI_RESET = "\u001B[0m";
 	public static final String ANSI_GREEN = "\u001B[32m";
 	public static final String HEADER_ID = "!!!___HEADER___!!!"; // TODO: ensure no col id matches this.
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	/// TODO: remove all (no size change)
+	
+	
+	
+	
+	
+	
 
 	// main ( String [] args )
 	//
@@ -135,10 +152,9 @@ class Migi
 		// Start at current version and migrate forwards
 		for(int m = currentFileMigrationVersion; m < latestXMLMigrationVersion; ++m)
 		{
-			Integer debugMigrationIndex = nListMigrations.getLength() + m;
 			System.out.println("Running Migration: #" + (m+1));
 			
-			Node nNextMigration = nListMigrations.item(nextFileMigrationVersion);
+			Node nNextMigration = nListMigrations.item(m);
 			NodeList nNextMigrationListColumns = ((Element)nNextMigration).getElementsByTagName("col");
 			
 			for(int nextMigrationColumnIndex = 0; nextMigrationColumnIndex < nNextMigrationListColumns.getLength(); nextMigrationColumnIndex++)
@@ -234,7 +250,7 @@ class Migi
 
 					// Demand that we require a column size for new columns introduced in the schema.
 					if( new String("(no size change)").equals(nextMigrationColumnSize) )
-						migiComplainAndExit("Error - Cannot create new column <col> tag without 'size=' attribute.\nProblem migration: " + debugMigrationIndex + "\nProblem column: " + (nextMigrationColumnIndex+1) + "\nProblem id: " + nextMigrationColumnID);
+						migiComplainAndExit("Error - Cannot create new column <col> tag without 'size=' attribute.\nProblem migration: " + m + "\nProblem column: " + (nextMigrationColumnIndex+1) + "\nProblem id: " + nextMigrationColumnID);
 
 					//-----------------------------------------------------------
 					// has the column been given a value
