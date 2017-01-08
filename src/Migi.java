@@ -1,5 +1,8 @@
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
@@ -64,6 +67,9 @@ class Migi
 		// TODO create more instances of Migi here:
 		// Migi.new and search through directories to get all migrations done in one command.
 		
+		if (ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN))
+			migiComplainAndExit("Error - System is big endian");
+
 		mArgs = args;
 
 		if(args.length <= 0) { migiComplainAndExit(migiHelperMessage()); }
@@ -273,9 +279,34 @@ class Migi
 			} // for(c)
 		} // for(m)
 		
-		//hjklhjk
-		// mNewBufferData.saveAllDataToNewFile, or show comparisions.. TODO:
-		// hjklhkjl
+		saveToFile(mFilename + ".mig.bin");
+	}
+	
+	
+	private static void saveToFile (String pPath)
+	{
+		FileOutputStream fileOuput = null;
+		
+		try
+		{
+			fileOuput = new FileOutputStream(pPath);
+		    
+		    for(int i = 0; i<mNewBufferData.size(); ++i)
+		    	fileOuput.write(mNewBufferData.get(i) );
+		    
+		    System.out.println("Done");
+
+		}
+		catch (IOException e) { e.printStackTrace(); }
+		finally
+		{
+			try
+			{
+				if (fileOuput != null)
+					fileOuput.close();
+			}
+			catch (IOException ex) { ex.printStackTrace(); }
+		}
 	}
 
 	// copyCurrentHeaderBufferIntoNextHeaderBuffer
