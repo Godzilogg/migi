@@ -549,14 +549,17 @@ class Migi
 				String nextColumnID = calcColumnIDFromNode(columnList.item(c), m, c);
 				String nextColumnSize = columnSizeFromNode(nextColumn);
 				
-				if( !(new String(columnID).equals(nextColumnID) ) )
+				if( (new String(columnID).equals(nextColumnID) ) && nextColumnSize != null )
 					columnSize = nextColumnSize;
 			}
 		}
 		
 		if(columnSize == null)
 			migiComplainAndExit("Error - Column <col> ID: " + columnID + " was never assigned a size= attribute in any migration.");
-
+		
+		System.out.println("v-----------------v fffff=== " + columnID);
+		System.out.println("v-----------------v fffff=== " + columnSize);
+		
 		return columnSize;
 	}
 	
