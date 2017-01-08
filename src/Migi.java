@@ -1,15 +1,12 @@
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.io.File;
-import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Map;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -20,7 +17,6 @@ import org.xml.sax.SAXException;
 import org.w3c.dom.Node;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
-
 
 class Migi
 {
@@ -65,10 +61,9 @@ class Migi
 	//
 	public static void main ( String [] args )
 	{
-
 		// TODO create more instances of Migi here:
 		// Migi.new and search through directories to get all migrations done in one command.
-
+		
 		mArgs = args;
 
 		if(args.length <= 0) { migiComplainAndExit(migiHelperMessage()); }
@@ -136,10 +131,7 @@ class Migi
 		{
 			Integer debugMigrationIndex = nListMigrations.getLength() + m;
 			System.out.println("Running Migration: v" + (debugMigrationIndex+1));
-			/*
-			Node nCurrentMigration = nListMigrations.item(currentFileMigrationVersion);
-			NodeList nCurrentMigrationListColumns = ((Element)nCurrentMigration).getElementsByTagName("col");
-			*/
+			
 			Node nNextMigration = nListMigrations.item(nextFileMigrationVersion);
 			NodeList nNextMigrationListColumns = ((Element)nNextMigration).getElementsByTagName("col");
 			
@@ -157,7 +149,7 @@ class Migi
 					// String  currentMigrationColumnID    = mCurrentBufferColumnIDs.get(currentMigrationColumnIndex);
 					
 					//-----------------------------------------------------------
-					// Handling size changes to column // aka has size changed?
+					// has the column size changed
 					//-----------------------------------------------------------
 					Integer latestColumnSize;
 					
@@ -183,11 +175,45 @@ class Migi
 					//-----------------------------------------------------------
 					// has the column been given a value
 					//-----------------------------------------------------------
-					
-					// Need common method to check if node has attrs, and determine how to interpret that data.
-					
-					mNewBufferData.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextColumnOfBytes);
+					Integer nextMigrationColumnSizeInt = latestColumnSize;
+					byte [] columnOfBytes = new byte[nextMigrationColumnSizeInt];
+					Arrays.fill(columnOfBytes, (byte)0x00);
+					// get <col> !this content! </col>
+					String strContent = nNextMigrationListColumns.item(nextMigrationColumnIndex).getTextContent().trim();
+
+					// Has the new column been given a default value?
+					if(strContent == null || strContent.isEmpty())
+					{
+						// Arrays.fill(columnOfBytes, (byte)0x00);
+					}
+					else
+					{
+						// if content is hex string
+						if(strContent.charAt(0) == '0' && strContent.charAt(1) == 'x')
+						{
+							columnOfBytes = StringToBuffer.convertHexString(strContent, nextMigrationColumnSizeInt);
+						}
+						// if content is a string literal
+						else if(strContent.charAt(0) == '"' || strContent.charAt(0) == '\'')
+						{
+							columnOfBytes = StringToBuffer.convertLiteralString(strContent, nextMigrationColumnSizeInt);
+						}
+						// if content is a numerical string
+						else if(Character.isDigit(strContent.charAt(1)) && !StringToBuffer.isFloatingPointString(strContent))
+						{
+							columnOfBytes = StringToBuffer.convertNumericalString(strContent, nextMigrationColumnSizeInt);
+						}
+						// if content is a floating point numerical string
+						else if(StringToBuffer.isFloatingPointString(strContent))
+						{
+							columnOfBytes = StringToBuffer.convertFloatingPointString(strContent, nextMigrationColumnSizeInt);
+						}
+						
+						mNewBufferData.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
+					}
+
 					mNewBufferColumnIDs.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnID);
+					mNewBufferColumnSizes.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnSizeInt);
 					//-----------------------------------------------------------
 					// end
 					//-----------------------------------------------------------
@@ -202,7 +228,6 @@ class Migi
 					//-----------------------------------------------------------
 					// has the column been given a value
 					//-----------------------------------------------------------
-
 					Integer nextMigrationColumnSizeInt = Integer.parseInt(nextMigrationColumnSize);
 					byte [] columnOfBytes = new byte[nextMigrationColumnSizeInt];
 					Arrays.fill(columnOfBytes, (byte)0x00);
@@ -224,109 +249,26 @@ class Migi
 						// if content is a string literal
 						else if(strContent.charAt(0) == '"' || strContent.charAt(0) == '\'')
 						{
-							// remove " or '
-							String strSubContent = strContent.substring(1, strContent.length()-1).trim();
-							byte [] convertedBytes = new byte[strSubContent.length()];
-							
-							// convert bytes
-							for(int i = 0; i < strSubContent.length(); i++)
-							{
-								convertedBytes[i] = (byte) strSubContent.charAt(i);
-							}
-							
-							// How many of these bytes can we keep? //
-							Integer validLength;
-							
-							if(columnOfBytes.length >= convertedBytes.length)
-								validLength = convertedBytes.length;
-							else
-								validLength = columnOfBytes.length;
-							
-							System.arraycopy(convertedBytes, 0, columnOfBytes, 0, validLength);
-
-/*
-							String sssss = null;
-							try {
-								sssss = new String(columnOfBytes, "ASCII");
-							} catch (UnsupportedEncodingException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-							System.out.println("v------v");
-							System.out.println(sssss);
-							System.out.println("^sssssed^");
-							*/
-							
+							columnOfBytes = StringToBuffer.convertLiteralString(strContent, nextMigrationColumnSizeInt);
 						}
 						// if content is a numerical string
-						else if(Character.isDigit(strContent.charAt(1)) && !isFloatingPointString(strContent))
+						else if(Character.isDigit(strContent.charAt(1)) && !StringToBuffer.isFloatingPointString(strContent))
 						{
-							// TODO: if size is 8 then make it a long-long.
-							//		 else 4 is int
-							//       anything_else make it raise an error
-							Integer intContent = Integer.parseInt(strContent);
-							byte [] convertedBytes = ByteBuffer.allocate(4).putInt(intContent).array(); // TODO: .order(ByteOrder.LITTLE_ENDIAN)
-							
-							// How many of these bytes can we keep? //
-							Integer validLength;
-							
-							if(columnOfBytes.length >= convertedBytes.length)
-								validLength = convertedBytes.length;
-							else
-								validLength = columnOfBytes.length;
-							
-							System.arraycopy(convertedBytes, 0, columnOfBytes, 0, validLength);
-
-
-							String sssss = null;
-							try {
-								sssss = new String(columnOfBytes, "ASCII");
-							} catch (UnsupportedEncodingException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-							System.out.println("v------v");
-							System.out.println(sssss);
-							System.out.println("^sssssed^");
-							
-						
+							columnOfBytes = StringToBuffer.convertNumericalString(strContent, nextMigrationColumnSizeInt);
 						}
 						// if content is a floating point numerical string
-						else if(isFloatingPointString(strContent))
+						else if(StringToBuffer.isFloatingPointString(strContent))
 						{
-							// TODO: if size is 8 then make it a double.
-							//		 else 4 is float
-							//       anything_else make it raise an error
-							Float floatContent = Float.parseFloat(strContent);
-							byte [] convertedBytes = ByteBuffer.allocate(4).putFloat(floatContent).array(); // TODO: .order(ByteOrder.LITTLE_ENDIAN)
-							
-							// How many of these bytes can we keep? //
-							Integer validLength;
-							
-							if(columnOfBytes.length >= convertedBytes.length)
-								validLength = convertedBytes.length;
-							else
-								validLength = columnOfBytes.length;
-							
-							System.arraycopy(convertedBytes, 0, columnOfBytes, 0, validLength);
-
-
-							String sssss = null;
-							try {
-								sssss = new String(columnOfBytes, "ASCII");
-							} catch (UnsupportedEncodingException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-							System.out.println("v------v");
-							System.out.println(sssss);
-							System.out.println("^sssssed^");
+							columnOfBytes = StringToBuffer.convertFloatingPointString(strContent, nextMigrationColumnSizeInt);
 						}
 					}
 
 					mNewBufferData.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
 					mNewBufferColumnIDs.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnID);
-					mNewBufferColumnSizes.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), Integer.parseInt(nextMigrationColumnSize));
+					mNewBufferColumnSizes.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnSizeInt);
+					//-----------------------------------------------------------
+					// end
+					//-----------------------------------------------------------
 				}
 			} // for(c)
 		} // for(m)
@@ -335,24 +277,7 @@ class Migi
 		// mNewBufferData.saveAllDataToNewFile, or show comparisions.. TODO:
 		// hjklhkjl
 	}
-	
-	
 
-
-	private static boolean isFloatingPointString(String str) {
-        try {
-            Float.parseFloat(str);
-            Double.parseDouble(str);
-            // if it has a period, we count as floating point, else it is a whole number
-            return (str.indexOf('.') >= 0) ? true : false;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
-
-
-	
 	// copyCurrentHeaderBufferIntoNextHeaderBuffer
 	//
 	// Header information is assumed to be stored in the first segment of the enumerable.
@@ -462,17 +387,6 @@ class Migi
 	//
 	private static void calcMigrationColumnAttrs (Integer pCurrentMigration)
 	{
-
-		//
-		pCurrentMigration += 1; ///// todo debug hereish... but why output
-		// initColumnSizes();
-		//
-		//
-		//  mXMLCurrentMigrationColumnIDs
-		//
-
-		System.out.println("// initColumnSizes();");
-
 		NodeList nListMigrations = docXML.getElementsByTagName(mFileID);
 		int stopMigrationIndex = (pCurrentMigration > nListMigrations.getLength()) ? nListMigrations.getLength() : pCurrentMigration;
 
@@ -480,7 +394,7 @@ class Migi
 		{
 			Node nMigration = nListMigrations.item(m);
 			NodeList columnList = ((Element) nMigration).getElementsByTagName("col");
-			System.out.println("---");
+			
 			for(int c = 0; c < columnList.getLength(); c++)
 			{
 				String columnSize = calcColumnSizeFromNode(columnList.item(c));
@@ -500,8 +414,6 @@ class Migi
 					mXMLCurrentMigrationColumnSizes.put(c, columnSize);
 				else if(m == 0) // First migration requires size attributes for all column tags
 					migiComplainAndExit("Error - First migration contains a <col> tag missing a 'size=' attribute.\nProblem column: " + (c+1) );
-
-				System.out.println(mXMLCurrentMigrationColumnSizes.get(c));
 			}
 		}
 	}
@@ -553,13 +465,6 @@ class Migi
 			mCurrentBufferData.put((i+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
 			mCurrentBufferColumnIDs.put((i+DEFAULT_HEADER_SIZE_INDEX), columnID);
 			mCurrentBufferColumnSizes.put((i+DEFAULT_HEADER_SIZE_INDEX), latestColumnSize);
-
-			/*
-			System.out.println("complaint");
-			System.out.println(columnOfBytes);
-			System.out.println(columnID);
-			System.out.println(latestColumnSize);
-			*/
 
 			offset += latestColumnSize;
 		}
