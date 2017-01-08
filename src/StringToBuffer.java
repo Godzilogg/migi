@@ -171,6 +171,7 @@ class StringToBuffer
 
 	private static void putsDebug(byte [] debugBytes)
 	{
+/*
 		String superDebuggerString = null;
 
 		try
@@ -181,7 +182,7 @@ class StringToBuffer
 
 		System.out.println("v-----------------v");
 		System.out.println("|  " + superDebuggerString);
-		System.out.println("^-----------------^");
+		System.out.println("^-----------------^");*/
 	}
 
 } // class //

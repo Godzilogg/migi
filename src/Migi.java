@@ -46,8 +46,6 @@ class Migi
 	private static HashMap<Integer, String> mXMLNextMigrationColumnSizes = new HashMap<Integer, String>();
 	private static HashMap<String, Integer> mXMLNextMigrationColumnIDs = new HashMap<String, Integer>();
 	private static HashMap<String, Integer> mXMLNextMigrationColumnIndices = new HashMap<String, Integer>();
-	
-	private static HashMap<String, Integer> mListOfHandledColumnIDs = new HashMap<String, Integer>();
 
 	public static final Integer DEFAULT_HEADER_SIZE = 8;
 	public static final Integer DEFAULT_HEADER_SIZE_INDEX = 1;
@@ -122,33 +120,40 @@ class Migi
 		// Get all migrations for file.
 		NodeList nListMigrations = docXML.getElementsByTagName(mFileID);
 		Integer currentFileMigrationVersion = mFileIDVersion;
-		Integer latestXMLMigrationVersion = nListMigrations.getLength() +1;
-
+		Integer latestXMLMigrationVersion = nListMigrations.getLength();
+		Integer nextFileMigrationVersion = currentFileMigrationVersion +1;
+		
 		if(currentFileMigrationVersion >= latestXMLMigrationVersion)
-			return;
+			migiComplainAndExit("Aborting - Bin file is up to date with latest migration for: " + mFileID + " v" + currentFileMigrationVersion);
 		
-		Integer nextFileMigrationVersion = currentFileMigrationVersion+1;
 		calcNextMigrationColumnAttrs(nextFileMigrationVersion);
-		
 		copyCurrentHeaderBufferIntoNextHeaderBuffer();
+		
+		System.out.println("v--------ruuning migration   " + (currentFileMigrationVersion));
+		System.out.println("v----------to  " + (latestXMLMigrationVersion));
 
 		// Start at current version and migrate forwards
-		for(int m = currentFileMigrationVersion-1; m < (latestXMLMigrationVersion-1); ++m)
+		for(int m = currentFileMigrationVersion; m < latestXMLMigrationVersion; ++m)
 		{
 			Integer debugMigrationIndex = nListMigrations.getLength() + m;
-			System.out.println("Running Migration: v" + (debugMigrationIndex+1));
+			System.out.println("Running Migration: #" + (m+1));
 			
 			Node nNextMigration = nListMigrations.item(nextFileMigrationVersion);
 			NodeList nNextMigrationListColumns = ((Element)nNextMigration).getElementsByTagName("col");
 			
 			for(int nextMigrationColumnIndex = 0; nextMigrationColumnIndex < nNextMigrationListColumns.getLength(); nextMigrationColumnIndex++)
 			{
-				String nextMigrationColumnSize = calcColumnSizeFromNode(nNextMigrationListColumns.item(nextMigrationColumnIndex));
+				String nextMigrationColumnSize = calcColumnSizeFromNode(nNextMigrationListColumns.item(nextMigrationColumnIndex), m);
 				String nextMigrationColumnID   = calcColumnIDFromNode(nNextMigrationListColumns.item(nextMigrationColumnIndex), m, nextMigrationColumnIndex);
 				
+				System.out.println("==   " + nextMigrationColumnID);
+				
 				// if column exists in previous migration
-				if( (mXMLCurrentMigrationColumnIDs.containsValue(nextMigrationColumnID)) )
+				if( (mXMLCurrentMigrationColumnIDs.containsKey(nextMigrationColumnID)) )
 				{
+					
+					System.out.println("v-----------------v   " + nextMigrationColumnID);
+					
 					// get previous migration column and all data associated.
 					Integer currentMigrationColumnIndex = mXMLCurrentMigrationColumnIndices.get(nextMigrationColumnID);
 					Integer currentMigrationColumnSize  = mCurrentBufferColumnSizes.get(currentMigrationColumnIndex);
@@ -428,13 +433,12 @@ class Migi
 			
 			for(int c = 0; c < columnList.getLength(); c++)
 			{
-				String columnSize = calcColumnSizeFromNode(columnList.item(c));
+				String columnSize = calcColumnSizeFromNode(columnList.item(c), pCurrentMigration);
 				String columnID   = calcColumnIDFromNode(columnList.item(c), m, c);
 
-				if(mXMLCurrentMigrationColumnIDs.containsKey(columnID))  {
+				if(mXMLCurrentMigrationColumnIDs.containsKey(columnID))
 					if(mXMLCurrentMigrationColumnIDs.get(columnID) == m)
 						migiComplainAndExit("Error - More than one <col> tag contains the same 'id=' attribute value inside a single migration." + "\nProblem migration: " + (m+1) + "\nProblem column: " + (c+1) + "\nProblem id: " + columnID );
-				}
 
 				// Log the unique columnIDs and which migration version they support.
 				mXMLCurrentMigrationColumnIDs.put(columnID, m);
@@ -457,14 +461,13 @@ class Migi
 
 		for(int c = 0; c < columnList.getLength(); c++)
 		{
-			String columnSize = calcColumnSizeFromNode(columnList.item(c));
+			String columnSize = calcColumnSizeFromNode(columnList.item(c), pMigration);
 			String columnID   = calcColumnIDFromNode(columnList.item(c), pMigration, c);
 			Integer columnIndex = c;
 			
-			if(mXMLCurrentMigrationColumnIDs.containsKey(columnID))  {
+			if(mXMLCurrentMigrationColumnIDs.containsKey(columnID))
 				if(mXMLCurrentMigrationColumnIDs.get(columnID) == pMigration)
 					migiComplainAndExit("Error - More than one <col> tag contains the same 'id=' attribute value inside a single migration." + "\nProblem migration: " + (pMigration+1) + "\nProblem column: " + (c+1) + "\nProblem id: " + columnID );
-			}
 
 			mXMLNextMigrationColumnIndices.put(columnID, columnIndex);
 			mXMLNextMigrationColumnIDs.put(columnID, pMigration);
@@ -482,14 +485,14 @@ class Migi
 		for(int i = 0; i < pCurrentListColumns.getLength(); i++)
 		{
 			String columnID = calcColumnIDFromNode(pCurrentListColumns.item(i), mFileIDVersion, i);
-			String columnSize = calcColumnSizeFromNode(pCurrentListColumns.item(i));
-
-			// mXMLCurrentMigrationColumnSizes will have already been filled and set at this point,
-			// or thrown an error if no sizes were specified in base migration.
-			if( !(new String("(no size change)").equals(columnSize) ) )
-				columnSize = mXMLCurrentMigrationColumnSizes.get(i);
-
+			String columnSize = calcColumnSizeFromNode(pCurrentListColumns.item(i), mFileIDVersion);
 			Integer latestColumnSize = Integer.parseInt(columnSize);
+			
+			System.out.println("v-----------------v migration    " + mFileIDVersion );
+			System.out.println("v-----------------v columnID    " + columnID );
+			System.out.println("v-----------------v columnSize  " + columnSize );
+			System.out.println("v-----------------v wtf  " + mXMLCurrentMigrationColumnSizes.get(i));
+
 			byte [] columnOfBytes = new byte[latestColumnSize];
 			System.arraycopy(mFileBytes, offset, columnOfBytes, 0, latestColumnSize);
 
@@ -501,11 +504,51 @@ class Migi
 		}
 	}
 
-	private static String calcColumnSizeFromNode (Node pColumn)
+	private static String calcColumnSizeFromNode (Node pColumn, int pMigrationNumber)
 	{
 		NamedNodeMap mapAttrs = pColumn.getAttributes();
 		Node nColumnSize = mapAttrs.getNamedItem("size");
-		return (nColumnSize != null) ? nColumnSize.getTextContent() : "(no size change)";
+		String columnID = calcColumnIDFromNode (pColumn, pMigrationNumber, 0);
+		String columnSize = null;
+		
+		if(nColumnSize != null)
+			return nColumnSize.getTextContent().trim();
+		
+		System.out.println("v-----------------v wwww  ");
+		
+		// search through all the migrations and log the latest size for the specific columnID
+		// up to the current migration
+		
+		NodeList nListMigrations = docXML.getElementsByTagName(mFileID);
+
+		for(int m = 0; m < pMigrationNumber; m++)
+		{
+			System.out.println("v-----------------v fffff  ");
+			Node nMigration = nListMigrations.item(m);
+			NodeList columnList = ((Element) nMigration).getElementsByTagName("col");
+
+			for(int c = 0; c < columnList.getLength(); c++)
+			{
+				Node nextColumn = columnList.item(c);
+				String nextColumnID = calcColumnIDFromNode(columnList.item(c), m, c);
+				String nextColumnSize = columnSizeFromNode(nextColumn);
+				
+				if( !(new String(columnID).equals(nextColumnID) ) )
+					columnSize = nextColumnSize;
+			}
+		}
+		
+		if(columnSize == null)
+			migiComplainAndExit("Error - Column <col> ID: " + columnID + " was never assigned a size= attribute in any migration.");
+
+		return columnSize;
+	}
+	
+	private static String columnSizeFromNode (Node pColumn)
+	{
+		NamedNodeMap ColumnAttrs = pColumn.getAttributes();
+		Node ColumnSize = ColumnAttrs.getNamedItem("size");
+		return (ColumnSize == null) ? null : ColumnSize.getTextContent().trim();
 	}
 
 	private static String calcColumnIDFromNode (Node pColumn, int pMigrationNumber, int pColumnNumber)
@@ -529,11 +572,6 @@ class Migi
 		mCurrentBufferColumnSizes.put(0, DEFAULT_HEADER_SIZE);
 
 		return DEFAULT_HEADER_SIZE;
-	}
-
-	private static Node firstMigrationNode () {
-		NodeList nList = docXML.getElementsByTagName(mFileID);
-		return nList.item(0);
 	}
 
 	private static void migiComplainAndExit ( String complaint ) {
@@ -562,21 +600,17 @@ class Migi
 		{
 			System.out.print(mArgs[i] + " ");
 
-			if(new String("-i").equals(mArgs[i])) {
-				if(mArgs.length <= i+1) {
+			if(new String("-i").equals(mArgs[i]))
+				if(mArgs.length <= i+1)
 					migiComplainAndExit("-i specified with no input path specified.");
-				} else {
+				else
 					mFilename = mArgs[i+1];
-				}
-			}
 
-			if(new String("-m").equals(mArgs[i])) {
-				if(mArgs.length <= i+1) {
+			if(new String("-m").equals(mArgs[i]))
+				if(mArgs.length <= i+1)
 					migiComplainAndExit("-m specified with no migration path or file specified.");
-				} else {
+				else
 					mMigrationPath = mArgs[i+1];
-				}
-			}
 		}
 		System.out.print("\n");
 	}
