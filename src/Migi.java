@@ -2,6 +2,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.nio.ByteOrder;
@@ -150,17 +151,20 @@ class Migi
 		System.out.println("v----------to  " + (latestXMLMigrationVersion));
 
 		// Start at current version and migrate forwards
-		for(int m = currentFileMigrationVersion; m < latestXMLMigrationVersion; ++m)
+		for(int m = currentFileMigrationVersion; m < (latestXMLMigrationVersion-1); ++m)
 		{
 			System.out.println("Running Migration: #" + (m+1));
 			
-			Node nNextMigration = nListMigrations.item(m);
+			Node nNextMigration = nListMigrations.item(m+1);
 			NodeList nNextMigrationListColumns = ((Element)nNextMigration).getElementsByTagName("col");
 			
-			for(int nextMigrationColumnIndex = 0; nextMigrationColumnIndex < nNextMigrationListColumns.getLength(); nextMigrationColumnIndex++)
+			calcCurrentMigrationColumnIDs(m);
+			calcNextMigrationColumnIDs(m+1);
+			
+			for(int c = 0; c < nNextMigrationListColumns.getLength(); c++)
 			{
-				String nextMigrationColumnSize = calcColumnSizeFromNode(nNextMigrationListColumns.item(nextMigrationColumnIndex), m);
-				String nextMigrationColumnID   = calcColumnIDFromNode(nNextMigrationListColumns.item(nextMigrationColumnIndex), m, nextMigrationColumnIndex);
+				String nextMigrationColumnSize = calcColumnSizeFromNode(nNextMigrationListColumns.item(c), (m+1));
+				String nextMigrationColumnID   = calcColumnIDFromNode(nNextMigrationListColumns.item(c), (m+1), c);
 				
 				System.out.println("==   " + nextMigrationColumnID);
 				
@@ -168,8 +172,8 @@ class Migi
 				if( (mXMLCurrentMigrationColumnIDs.containsKey(nextMigrationColumnID)) )
 				{
 					
-					System.out.println("v-----------------v   " + nextMigrationColumnID);
-					
+					System.out.println("<<<< " + nextMigrationColumnID);
+
 					// get previous migration column and all data associated.
 					Integer currentMigrationColumnIndex = mXMLCurrentMigrationColumnIndices.get(nextMigrationColumnID);
 					Integer currentMigrationColumnSize  = mCurrentBufferColumnSizes.get(currentMigrationColumnIndex);
@@ -179,6 +183,7 @@ class Migi
 					// has the column size changed
 					//-----------------------------------------------------------
 					Integer latestColumnSize;
+					Integer copySize;
 					
 					// has size changed?
 					if( currentMigrationColumnSize != Integer.parseInt(nextMigrationColumnSize) )
@@ -188,12 +193,48 @@ class Migi
 					
 					// allocate memory with the new size (if anything has changed)
 					byte [] nextColumnOfBytes = new byte[latestColumnSize];
-					byte [] currentColumnOfBytes = mCurrentBufferData.get(currentMigrationColumnIndex);
-					System.arraycopy(currentColumnOfBytes, 0, nextColumnOfBytes, 0, latestColumnSize);
+					Arrays.fill(nextColumnOfBytes, (byte)0x00);
+					
+					// TODO: asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf
+					// We are not getting proper index here.
+					// What if mCurrentBufferData[migration = 0][column = 2+DEFAULT_HEADER] == "abc"
+					// What if mCurrentBufferData[migration = 1][column = 2+DEFAULT_HEADER] == "iii"
+					//
+					// mCurrentBufferData.get(currentMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX);
+					//
+					// In other words, this means saving data like we save Size.
+					//
+					// "asdf" => "abc"
+					// "asdf"
+					// "asdf"
+					//
+					// They need to be stored in another hash. like:
+					// mHangOverBufferDataByColumnID<String, byte []> // ColumnID by ByteArray, will fix everything..
+					// because now we are overwriting mCurrentBufferData index data..
+					// so we loose it.
+					byte [] currentColumnOfBytes = mCurrentBufferData.get(currentMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX);
+					
+					
+					byte [] newColumnOfBytes = mNewBufferData.get(currentMigrationColumnIndex);
+					System.out.println("<<<< latestColumnSize  " + latestColumnSize);
+					System.out.println("<<<< nextColumnOfBytes.length  " + nextColumnOfBytes.length);
+					System.out.println("<<<< currentColumnOfBytes.length  " + currentColumnOfBytes.length);
+					
+					if(newColumnOfBytes != null)
+					System.out.println("<<<< newColumnOfBytes.length  " + newColumnOfBytes.length);
+					
+					
+					
+					if( nextColumnOfBytes.length >= currentColumnOfBytes.length )
+						copySize = currentColumnOfBytes.length;
+					else
+						copySize = nextColumnOfBytes.length;
+					
+					System.arraycopy(currentColumnOfBytes, 0, nextColumnOfBytes, 0, copySize);
 
-					mNewBufferData.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextColumnOfBytes);
-					mNewBufferColumnIDs.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnID);
-					mNewBufferColumnSizes.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), latestColumnSize);
+					mNewBufferData.put((c+DEFAULT_HEADER_SIZE_INDEX), nextColumnOfBytes);
+					mNewBufferColumnIDs.put((c+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnID);
+					mNewBufferColumnSizes.put((c+DEFAULT_HEADER_SIZE_INDEX), latestColumnSize);
 					//-----------------------------------------------------------
 					// end
 					//-----------------------------------------------------------
@@ -204,14 +245,31 @@ class Migi
 					//-----------------------------------------------------------
 					Integer nextMigrationColumnSizeInt = latestColumnSize;
 					byte [] columnOfBytes = new byte[nextMigrationColumnSizeInt];
-					Arrays.fill(columnOfBytes, (byte)0x00);
+					
 					// get <col> !this content! </col>
-					String strContent = nNextMigrationListColumns.item(nextMigrationColumnIndex).getTextContent().trim();
+					String strContent = nNextMigrationListColumns.item(c).getTextContent().trim();
 
+					System.out.println("<<<<< [columnID2] " + nextMigrationColumnID);
+					
 					// Has the new column been given a default value?
 					if(strContent == null || strContent.isEmpty())
 					{
-						// Arrays.fill(columnOfBytes, (byte)0x00);
+						System.out.println("<<<<< [abyss] " );
+						
+						// TODO: asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf
+						// We are not getting proper index here.
+						// What if mCurrentBufferData[migration = 0][column = 2+DEFAULT_HEADER] == "abc"
+						// What if mCurrentBufferData[migration = 1][column = 2+DEFAULT_HEADER] == "iii"
+						//
+						// mCurrentBufferData.get(currentMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX);
+						byte [] defaultBytes = mCurrentBufferData.get(currentMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX);
+						
+						if( columnOfBytes.length >= defaultBytes.length )
+							copySize = defaultBytes.length;
+						else
+							copySize = columnOfBytes.length;
+						
+						System.arraycopy(defaultBytes, 0, columnOfBytes, 0, copySize);
 					}
 					else
 					{
@@ -224,6 +282,14 @@ class Migi
 						else if(strContent.charAt(0) == '"' || strContent.charAt(0) == '\'')
 						{
 							columnOfBytes = StringToBuffer.convertLiteralString(strContent, nextMigrationColumnSizeInt);
+							
+							String superDebuggerString = null;
+							try { superDebuggerString = new String(columnOfBytes, "ASCII"); }
+							
+							catch (UnsupportedEncodingException e) { e.printStackTrace(); }
+							System.out.println("<<<<< [columnID] " + nextMigrationColumnID);
+							System.out.println("<<<<< [columnsuperDebuggerString] " + superDebuggerString);
+							
 						}
 						// if content is a numerical string
 						else if(Character.isDigit(strContent.charAt(1)) && !StringToBuffer.isFloatingPointString(strContent))
@@ -236,11 +302,11 @@ class Migi
 							columnOfBytes = StringToBuffer.convertFloatingPointString(strContent, nextMigrationColumnSizeInt);
 						}
 						
-						mNewBufferData.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
+						mNewBufferData.put((c+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
 					}
 
-					mNewBufferColumnIDs.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnID);
-					mNewBufferColumnSizes.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnSizeInt);
+					mNewBufferColumnIDs.put((c+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnID);
+					mNewBufferColumnSizes.put((c+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnSizeInt);
 					//-----------------------------------------------------------
 					// end
 					//-----------------------------------------------------------
@@ -250,21 +316,21 @@ class Migi
 
 					// Demand that we require a column size for new columns introduced in the schema.
 					if( new String("(no size change)").equals(nextMigrationColumnSize) )
-						migiComplainAndExit("Error - Cannot create new column <col> tag without 'size=' attribute.\nProblem migration: " + m + "\nProblem column: " + (nextMigrationColumnIndex+1) + "\nProblem id: " + nextMigrationColumnID);
+						migiComplainAndExit("Error - Cannot create new column <col> tag without 'size=' attribute.\nProblem migration: " + m + "\nProblem column: " + (c+1) + "\nProblem id: " + nextMigrationColumnID);
 
 					//-----------------------------------------------------------
 					// has the column been given a value
 					//-----------------------------------------------------------
 					Integer nextMigrationColumnSizeInt = Integer.parseInt(nextMigrationColumnSize);
 					byte [] columnOfBytes = new byte[nextMigrationColumnSizeInt];
-					Arrays.fill(columnOfBytes, (byte)0x00);
+					
 					// get <col> !this content! </col>
-					String strContent = nNextMigrationListColumns.item(nextMigrationColumnIndex).getTextContent().trim();
+					String strContent = nNextMigrationListColumns.item(c).getTextContent().trim();
 
 					// Has the new column been given a default value?
 					if(strContent == null || strContent.isEmpty())
 					{
-						// Arrays.fill(columnOfBytes, (byte)0x00);
+						Arrays.fill(columnOfBytes, (byte)0x00);
 					}
 					else
 					{
@@ -290,14 +356,33 @@ class Migi
 						}
 					}
 
-					mNewBufferData.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
-					mNewBufferColumnIDs.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnID);
-					mNewBufferColumnSizes.put((nextMigrationColumnIndex+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnSizeInt);
+					mNewBufferData.put((c+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
+					mNewBufferColumnIDs.put((c+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnID);
+					mNewBufferColumnSizes.put((c+DEFAULT_HEADER_SIZE_INDEX), nextMigrationColumnSizeInt);
 					//-----------------------------------------------------------
 					// end
 					//-----------------------------------------------------------
 				}
+				
+				String superDebuggerString = null;
+				try
+				{
+					superDebuggerString = new String(mNewBufferData.get(c+1), "ASCII");
+				}
+				catch (UnsupportedEncodingException e) { e.printStackTrace(); }
+
+		    	System.out.println("m-----------------------");
+		    	System.out.println("mi|   " + mNewBufferColumnIDs.get(c+1));
+		    	System.out.println("ms|   " + mNewBufferColumnSizes.get(c+1));
+		    	System.out.println("md|   " + superDebuggerString);
+		    	System.out.println("mds|   " + superDebuggerString.length());
+		    	System.out.println("m-----------------------");
+
 			} // for(c)
+			
+			// Very important! Keep this line or die miserableleyl
+			copyNextBufferIntoCurrentBuffer();
+			
 		} // for(m)
 		
 		saveToFile(mFilename + ".mig.bin");
@@ -312,9 +397,25 @@ class Migi
 		{
 			fileOuput = new FileOutputStream(pPath);
 		    
-		    for(int i = 0; i<mNewBufferData.size(); ++i)
+		    for(int i = 0; i<mNewBufferData.size(); ++i) {
 		    	fileOuput.write(mNewBufferData.get(i) );
-		    
+		    	
+		    	
+				String superDebuggerString = null;
+
+				try
+				{
+					superDebuggerString = new String(mNewBufferData.get(i), "ASCII");
+				}
+				catch (UnsupportedEncodingException e) { e.printStackTrace(); }
+
+		    	System.out.println("v-------------------------");
+		    	System.out.println("v--i|   " + mNewBufferColumnIDs.get(i));
+		    	System.out.println("v--s|   " + mNewBufferColumnSizes.get(i));
+		    	System.out.println("v--d|   " + superDebuggerString);
+		    	System.out.println("v-------------------------");
+
+		    }
 		    System.out.println("Done");
 
 		}
@@ -329,7 +430,69 @@ class Migi
 			catch (IOException ex) { ex.printStackTrace(); }
 		}
 	}
+	
+	
+	
+	//=======================================
+	//
+	//=======================================
+	private static void calcCurrentMigrationColumnIDs (Integer pMigration)
+	{
+		NodeList nListMigrations = docXML.getElementsByTagName(mFileID);
 
+		//for(int m = 0; m < nListMigrations.getLength(); m++)
+		{
+			Node nMigration = nListMigrations.item(pMigration);
+			NodeList columnList = ((Element) nMigration).getElementsByTagName("col");
+
+			for(int c = 0; c < columnList.getLength(); c++)
+			{
+				System.out.println("v-------------------------presouls " );
+				
+				String columnID = calcColumnIDFromNode(columnList.item(c), pMigration, c);
+				String columnSize = calcColumnSizeFromNode(columnList.item(c), pMigration);
+		    	System.out.println("v-------------------------presoulsID " + columnID);
+		    	System.out.println("v-------------------------presoulsSize " + columnSize);
+		    	
+				mXMLCurrentMigrationColumnSizes.put(c, columnSize);
+				mXMLCurrentMigrationColumnIDs.put(columnID, pMigration);
+				mXMLCurrentMigrationColumnIndices.put(columnID, c);
+			}
+		}
+	}
+	
+	private static void calcNextMigrationColumnIDs (Integer pMigration)
+	{
+		NodeList nListMigrations = docXML.getElementsByTagName(mFileID);
+		
+		//for(int m = 0; m < nListMigrations.getLength(); m++)
+		{
+			Node nMigration = nListMigrations.item(pMigration);
+			NodeList columnList = ((Element) nMigration).getElementsByTagName("col");
+
+			for(int c = 0; c < columnList.getLength(); c++)
+			{
+
+				String columnID = calcColumnIDFromNode(columnList.item(c), pMigration, c);
+				String columnSize = calcColumnSizeFromNode(columnList.item(c), pMigration);
+		    	System.out.println("v-------------------------soulID " + columnID);
+		    	System.out.println("v-------------------------soulSize " + columnSize);
+		    	
+				mXMLNextMigrationColumnSizes.put(c, columnSize);
+				mXMLNextMigrationColumnIDs.put(columnID, pMigration);
+				mXMLNextMigrationColumnIndices.put(columnID, c);
+			}
+		}
+	}
+	//=======================================
+	//
+	//=======================================
+	
+	
+	
+	
+	
+	
 	// copyCurrentHeaderBufferIntoNextHeaderBuffer
 	//
 	// Header information is assumed to be stored in the first segment of the enumerable.
@@ -340,7 +503,17 @@ class Migi
 		mNewBufferColumnIDs.put(0, mCurrentBufferColumnIDs.get(0));
 		mNewBufferColumnSizes.put(0, mCurrentBufferColumnSizes.get(0));
 	}
-
+	
+	private static void copyNextBufferIntoCurrentBuffer ()
+	{
+		for(int i = 0; i<mNewBufferData.size(); ++i)
+		{
+			mCurrentBufferData.put(i, mNewBufferData.get(i));
+			mCurrentBufferColumnIDs.put(i, mNewBufferColumnIDs.get(i));
+			mCurrentBufferColumnSizes.put(i, mNewBufferColumnSizes.get(i));
+		}
+	}
+	
 	private static void processBinFile () throws IOException
 	{
 		Path path = Paths.get(mFilename);
@@ -530,7 +703,7 @@ class Migi
 		if(nColumnSize != null)
 			return nColumnSize.getTextContent().trim();
 		
-		System.out.println("v-----------------v wwww  ");
+		System.out.println("v-----------------v wwww  " + columnID);
 		
 		// search through all the migrations and log the latest size for the specific columnID
 		// up to the current migration
@@ -539,7 +712,7 @@ class Migi
 
 		for(int m = 0; m < pMigrationNumber; m++)
 		{
-			System.out.println("v-----------------v fffff  ");
+			System.out.println("v-----------------v fffff  " + m);
 			Node nMigration = nListMigrations.item(m);
 			NodeList columnList = ((Element) nMigration).getElementsByTagName("col");
 
