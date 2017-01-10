@@ -28,6 +28,7 @@ class Migi
 	static String mFileID = "RAD";
 	static Integer mFileIDVersion = 0;
 	static Document docXML;
+	static boolean mOverwriteFile = false;
 
 	private static HashMap<Integer, String> mXMLCurrentMigrationColumnSizes = new HashMap<Integer, String>();
 	private static HashMap<String, Integer> mXMLCurrentMigrationColumnIDs = new HashMap<String, Integer>();
@@ -309,8 +310,10 @@ class Migi
 			
 		} // for(m)
 		
-		// TODO: add overwrite file features
-		saveToFile(mFilename + ".mig.bin");
+		if(mOverwriteFile)
+			saveToFile(mFilename);
+		else
+			saveToFile(mFilename + ".mig.bin");
 	}
 	
 	
@@ -672,6 +675,9 @@ class Migi
 		for(int i = 0; i < mArgs.length; i++)
 		{
 			System.out.print(mArgs[i] + " ");
+			
+			if(new String("-r").equals(mArgs[i]) || new String("-R").equals(mArgs[i]))
+				mOverwriteFile = true;
 
 			if(new String("-i").equals(mArgs[i]))
 				if(mArgs.length <= i+1)
