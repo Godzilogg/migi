@@ -54,15 +54,15 @@ class Migi
 
 	// main ( String [] args )
 	//
-	// The heartbeat of the application, derp, <A>FWFA><#@M4tlkq34lakj lkadslkfja;sldkjfl;awj4e <--- (I can only get away with this on personal projects.)
-	//
-	// To run open up your terminal and cd to the Migi.class directory
-	// and type: java Migi -i "file.fun.bin" -m "C:\MyMigrations\FunMigration.xml"
+	// To run open up your terminal and type:
+	// 			java Migi -i "file.fun.bin" -m "C:\MyMigrations\FunMigration.xml"
+	// to overwrite file:
+	// 			java Migi -r -i "file.fun.bin" -m "C:\MyMigrations\FunMigration.xml"
 	//
 	public static void main ( String [] args )
 	{
-		// TODO create more instances of Migi here:
-		// Migi.new and search through directories to get all migrations done in one command.
+		// TODO: run through an entire migration directory
+		//       and migrate every binary file with same name as migration file.
 		
 		if (ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN))
 			migiComplainAndExit("Error - System is big endian");
