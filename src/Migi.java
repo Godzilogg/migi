@@ -6,6 +6,7 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 
@@ -50,8 +51,11 @@ class Migi
 
 	public static final Integer DEFAULT_HEADER_SIZE = 8;
 	public static final Integer DEFAULT_HEADER_SIZE_INDEX = 1;
+  public static final Integer BUFFER_HEADER_SIZE = 4;
+
 	public static final String ANSI_RESET = "\u001B[0m";
 	public static final String ANSI_GREEN = "\u001B[32m";
+  public static final String ANSI_RED   = "\u001B[31m";
 	public static final String HEADER_ID = "!!!___HEADER___!!!";
 
 	// main ( String [] args )
@@ -547,6 +551,10 @@ class Migi
 	{
 		NodeList nListMigrations = docXML.getElementsByTagName(mFileID);
 		Node nMigration = nListMigrations.item(pMigration);
+
+    if(nMigration == null)
+      migiComplainAndExit("Exiting - There is only one <" + mFileID + "> block </" + mFileID + "> migration. Cannot migrate forward.");
+
 		NodeList columnList = ((Element) nMigration).getElementsByTagName("col");
 
 		for(int c = 0; c < columnList.getLength(); c++)
@@ -573,8 +581,21 @@ class Migi
 		{
 			String columnID = calcColumnIDFromNode(pCurrentListColumns.item(i), mFileIDVersion, i);
 			String columnSize = calcColumnSizeFromNode(pCurrentListColumns.item(i), mFileIDVersion);
-			Integer latestColumnSize = Integer.parseInt(columnSize);
-			byte [] columnOfBytes = new byte[latestColumnSize];
+			Integer latestColumnSize = parseSizeString(columnSize);
+
+      // If we are dealing with a Blob with a Header
+      if(latestColumnSize == -1)
+      {
+        byte [] structBufferHeader = new byte[BUFFER_HEADER_SIZE];
+        System.arraycopy(mFileBytes, offset, structBufferHeader, 0, BUFFER_HEADER_SIZE);
+
+        int sizeBuffer = bytesToInt32(structBufferHeader);
+        latestColumnSize = sizeBuffer + BUFFER_HEADER_SIZE;
+
+        migiComplainAndExit("TODO"); // TODO:
+      }
+
+      byte [] columnOfBytes = new byte[latestColumnSize];
 			System.arraycopy(mFileBytes, offset, columnOfBytes, 0, latestColumnSize);
 
 			mCurrentBufferData.put((i+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
@@ -582,8 +603,40 @@ class Migi
 			mCurrentBufferColumnSizes.put((i+DEFAULT_HEADER_SIZE_INDEX), latestColumnSize);
 
 			offset += latestColumnSize;
-		}
-	}
+    }
+  }
+
+  private static boolean isSizeUndefined (String pColumnSize)
+	{
+    // return pColumnSize.equals("#") || pColumnSize.equals("?");
+    return (pColumnSize.charAt(0) == '#' || pColumnSize.charAt(0) == '?');
+  }
+
+  private static Integer parseSizeString (String pColumnSize)
+	{
+    if(isSizeUndefined(pColumnSize))
+      return -1;
+    else
+      return Integer.parseInt(pColumnSize);
+  }
+
+  private static int bytesToInt32(byte [] bytes)
+  {
+    /*
+    int value = bytes[0] & 0xFF;
+    value |= (bytes[1] << 8) & 0xFFFF;
+    value |= (bytes[2] << 16) & 0xFFFFFF;
+    value |= (bytes[3] << 24) & 0xFFFFFFFF;
+    return value;
+    */
+
+    return (
+      ((bytes[0] & 0xff) << 24) |
+      ((bytes[1] & 0xff) << 16) |
+      ((bytes[2] & 0xff) << 8)  |
+      ((bytes[3] & 0xff))
+    );
+  }
 
 	private static String calcColumnSizeFromNode (Node pColumn, int pMigrationNumber)
 	{
@@ -653,7 +706,7 @@ class Migi
 	}
 
 	private static void migiComplainAndExit ( String complaint ) {
-		System.out.println(complaint);
+		System.out.println(ANSI_RED + complaint + ANSI_RESET);
 		System.exit(0);
 	}
 
