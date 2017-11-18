@@ -1,4 +1,5 @@
 //vim: ts=2:tw=78: et:
+//Then Type into VIM: retab
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -251,6 +252,8 @@ class Migi
           //-----------------------------------------------------------
           // has the column been given a value
           //-----------------------------------------------------------
+
+          // TODO:
           Integer nextMigrationColumnSizeInt = Integer.parseInt(nextMigrationColumnSize);
           byte [] columnOfBytes = new byte[nextMigrationColumnSizeInt];
 
@@ -609,7 +612,6 @@ class Migi
 
   private static boolean isSizeUndefined (String pColumnSize)
   {
-    // return pColumnSize.equals("#") || pColumnSize.equals("?");
     return (pColumnSize.charAt(0) == '#' || pColumnSize.charAt(0) == '?');
   }
 
