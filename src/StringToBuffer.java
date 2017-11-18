@@ -1,3 +1,4 @@
+//vim: ts=2:tw=78: et:
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -171,17 +172,17 @@ class StringToBuffer
     private static void putsDebug(byte [] debugBytes)
     {
 /*
-		String superDebuggerString = null;
+    String superDebuggerString = null;
 
-		try
-		{
-			superDebuggerString = new String(debugBytes, "ASCII");
-		}
-		catch (UnsupportedEncodingException e) { e.printStackTrace(); }
+    try
+    {
+      superDebuggerString = new String(debugBytes, "ASCII");
+    }
+    catch (UnsupportedEncodingException e) { e.printStackTrace(); }
 
-		System.out.println("v-----------------v");
-		System.out.println("|  " + superDebuggerString);
-		System.out.println("^-----------------^");*/
+    System.out.println("v-----------------v");
+    System.out.println("|  " + superDebuggerString);
+    System.out.println("^-----------------^");*/
     }
 
 } // class //
