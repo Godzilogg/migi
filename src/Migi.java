@@ -511,6 +511,10 @@ class Migi
   {
     NodeList nListMigrations = docXML.getElementsByTagName(mFileID);
     Node nCurrentMigration = nListMigrations.item(mFileIDVersion);
+
+    if(nCurrentMigration == null)
+      migiComplainAndExit("Error - There is no Migration for file Version: " + mFileIDVersion + "\nHint: " + mFileID + " with version 0x00 would migrate the file from the first migration block to the last migration block.\nStarting the file version at 0x01 would assume the file's binary was already migrated to the first migration, and would proceed onwards from that block.\n(It would skip the first migration block.)");
+
     NodeList listColumns = ((Element)nCurrentMigration).getElementsByTagName("col");
 
     calcMigrationColumnAttrs(mFileIDVersion);
@@ -593,10 +597,12 @@ class Migi
         byte [] structBufferHeader = new byte[BUFFER_HEADER_SIZE];
         System.arraycopy(mFileBytes, offset, structBufferHeader, 0, BUFFER_HEADER_SIZE);
 
+        System.out.println("structBufferHeader " + structBufferHeader);
         int sizeBuffer = bytesToInt32(structBufferHeader);
+        System.out.println("sizeBuffer " + sizeBuffer);
         latestColumnSize = sizeBuffer + BUFFER_HEADER_SIZE;
 
-        migiComplainAndExit("TODO"); // TODO:
+        migiComplainAndExit("TODO " + latestColumnSize); // TODO:
       }
 
       byte [] columnOfBytes = new byte[latestColumnSize];
@@ -625,19 +631,11 @@ class Migi
 
   private static int bytesToInt32(byte [] bytes)
   {
-    /*
-    int value = bytes[0] & 0xFF;
-    value |= (bytes[1] << 8) & 0xFFFF;
-    value |= (bytes[2] << 16) & 0xFFFFFF;
-    value |= (bytes[3] << 24) & 0xFFFFFFFF;
-    return value;
-    */
-
     return (
-      ((bytes[0] & 0xff) << 24) |
-      ((bytes[1] & 0xff) << 16) |
-      ((bytes[2] & 0xff) << 8)  |
-      ((bytes[3] & 0xff))
+      ((bytes[0] & 0xff))       |
+      ((bytes[1] & 0xff) << 8)  |
+      ((bytes[2] & 0xff) << 16) |
+      ((bytes[3] & 0xff) << 24)
     );
   }
 
