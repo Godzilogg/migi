@@ -35,9 +35,13 @@ class Migi
   static Document docXML;
   static boolean mOverwriteFile = false;
 
-  private static HashMap<Integer, String> mXMLCurrentMigrationColumnSizes = new HashMap<Integer, String>();
+  private static HashMap<Integer, Integer> mXMLCurrentMigrationColumnSizes = new HashMap<Integer, Integer>();
   private static HashMap<String, Integer> mXMLCurrentMigrationColumnIDs = new HashMap<String, Integer>();
   private static HashMap<String, Integer> mXMLCurrentMigrationColumnIndices = new HashMap<String, Integer>();
+
+  private static HashMap<Integer, Integer> mXMLNextMigrationColumnSizes = new HashMap<Integer, Integer>();
+  private static HashMap<String, Integer> mXMLNextMigrationColumnIDs = new HashMap<String, Integer>();
+  private static HashMap<String, Integer> mXMLNextMigrationColumnIndices = new HashMap<String, Integer>();
 
   private static HashMap<Integer,byte[]> mCurrentBufferData = new HashMap<Integer, byte []>();
   private static HashMap<Integer,String> mCurrentBufferColumnIDs = new HashMap<Integer, String>();
@@ -46,10 +50,6 @@ class Migi
   private static HashMap<Integer,byte[]> mNewBufferData = new HashMap<Integer, byte []>();
   private static HashMap<Integer,String> mNewBufferColumnIDs = new HashMap<Integer, String>();
   private static HashMap<Integer,Integer> mNewBufferColumnSizes = new HashMap<Integer, Integer>();
-
-  private static HashMap<Integer, String> mXMLNextMigrationColumnSizes = new HashMap<Integer, String>();
-  private static HashMap<String, Integer> mXMLNextMigrationColumnIDs = new HashMap<String, Integer>();
-  private static HashMap<String, Integer> mXMLNextMigrationColumnIndices = new HashMap<String, Integer>();
 
   public static final Integer DEFAULT_HEADER_SIZE = 8;
   public static final Integer DEFAULT_HEADER_SIZE_INDEX = 1;
@@ -148,7 +148,7 @@ class Migi
 
       for(int c = 0; c < nNextMigrationListColumns.getLength(); c++)
       {
-        String nextMigrationColumnSize = calcColumnSizeFromNode(nNextMigrationListColumns.item(c), (m+1));
+        int nextMigrationColumnSize = calcColumnSizeFromNode(nNextMigrationListColumns.item(c), (m+1));
         String nextMigrationColumnID   = calcColumnIDFromNode(nNextMigrationListColumns.item(c), (m+1), c);
 
         System.out.println("| <col id=" + nextMigrationColumnID + " />");
@@ -168,8 +168,8 @@ class Migi
           Integer copySize;
 
           // has size changed?
-          if( currentMigrationColumnSize != Integer.parseInt(nextMigrationColumnSize) )
-            latestColumnSize = Integer.parseInt(nextMigrationColumnSize);
+          if( currentMigrationColumnSize != nextMigrationColumnSize )
+            latestColumnSize = nextMigrationColumnSize;
           else
             latestColumnSize = currentMigrationColumnSize;
 
@@ -254,7 +254,7 @@ class Migi
           //-----------------------------------------------------------
 
           // TODO:
-          Integer nextMigrationColumnSizeInt = Integer.parseInt(nextMigrationColumnSize);
+          Integer nextMigrationColumnSizeInt = nextMigrationColumnSize;
           byte [] columnOfBytes = new byte[nextMigrationColumnSizeInt];
 
           // get <col> !this content! </col>
@@ -376,7 +376,7 @@ class Migi
     for(int c = 0; c < columnList.getLength(); c++)
     {
       String columnID = calcColumnIDFromNode(columnList.item(c), pMigration, c);
-      String columnSize = calcColumnSizeFromNode(columnList.item(c), pMigration);
+      int columnSize = calcColumnSizeFromNode(columnList.item(c), pMigration);
 
       mXMLCurrentMigrationColumnSizes.put(c, columnSize);
       mXMLCurrentMigrationColumnIDs.put(columnID, pMigration);
@@ -393,7 +393,7 @@ class Migi
     for(int c = 0; c < columnList.getLength(); c++)
     {
       String columnID = calcColumnIDFromNode(columnList.item(c), pMigration, c);
-      String columnSize = calcColumnSizeFromNode(columnList.item(c), pMigration);
+      int columnSize = calcColumnSizeFromNode(columnList.item(c), pMigration);
 
       mXMLNextMigrationColumnSizes.put(c, columnSize);
       mXMLNextMigrationColumnIDs.put(columnID, pMigration);
@@ -540,7 +540,7 @@ class Migi
 
       for(int c = 0; c < columnList.getLength(); c++)
       {
-        String columnSize = calcColumnSizeFromNode(columnList.item(c), pCurrentMigration);
+        int columnSize = calcColumnSizeFromNode(columnList.item(c), pCurrentMigration);
         String columnID   = calcColumnIDFromNode(columnList.item(c), m, c);
 
         if(mXMLCurrentMigrationColumnIDs.containsKey(columnID))
@@ -567,7 +567,7 @@ class Migi
 
     for(int c = 0; c < columnList.getLength(); c++)
     {
-      String columnSize = calcColumnSizeFromNode(columnList.item(c), pMigration);
+      int columnSize = calcColumnSizeFromNode(columnList.item(c), pMigration);
       String columnID   = calcColumnIDFromNode(columnList.item(c), pMigration, c);
       Integer columnIndex = c;
 
@@ -588,8 +588,7 @@ class Migi
     for(int i = 0; i < pCurrentListColumns.getLength(); i++)
     {
       String columnID = calcColumnIDFromNode(pCurrentListColumns.item(i), mFileIDVersion, i);
-      String columnSize = calcColumnSizeFromNode(pCurrentListColumns.item(i), mFileIDVersion);
-      Integer latestColumnSize = parseSizeString(columnSize);
+      int latestColumnSize = calcColumnSizeFromNode(pCurrentListColumns.item(i), mFileIDVersion);
 
       // If we are dealing with a Blob with a Header
       if(latestColumnSize == -1)
@@ -597,12 +596,10 @@ class Migi
         byte [] structBufferHeader = new byte[BUFFER_HEADER_SIZE];
         System.arraycopy(mFileBytes, offset, structBufferHeader, 0, BUFFER_HEADER_SIZE);
 
-        System.out.println("structBufferHeader " + structBufferHeader);
         int sizeBuffer = bytesToInt32(structBufferHeader);
-        System.out.println("sizeBuffer " + sizeBuffer);
         latestColumnSize = sizeBuffer + BUFFER_HEADER_SIZE;
 
-        migiComplainAndExit("TODO " + latestColumnSize); // TODO:
+        // migiComplainAndExit("TODO " + latestColumnSize); // TODO:
       }
 
       byte [] columnOfBytes = new byte[latestColumnSize];
@@ -639,15 +636,13 @@ class Migi
     );
   }
 
-  private static String calcColumnSizeFromNode (Node pColumn, int pMigrationNumber)
+  private static int calcColumnSizeFromNode (Node pColumn, int pMigrationNumber)
   {
-    NamedNodeMap mapAttrs = pColumn.getAttributes();
-    Node nColumnSize = mapAttrs.getNamedItem("size");
-    String columnID = calcColumnIDFromNode (pColumn, pMigrationNumber, 0);
-    String columnSize = null;
+    String columnID = calcColumnIDFromNode(pColumn, pMigrationNumber, 0);
+    String columnSize = columnSizeFromNode(pColumn);
 
-    if(nColumnSize != null)
-      return nColumnSize.getTextContent().trim();
+    if(columnSize != null)
+      return parseSizeString(columnSize);
 
     // search through all the migrations and log the latest size for the specific columnID
     // up to the current migration
@@ -673,7 +668,7 @@ class Migi
     if(columnSize == null)
       migiComplainAndExit("Error - Column <col> ID: " + columnID + " was never assigned a size= attribute in any migration.");
 
-    return columnSize;
+    return parseSizeString(columnSize);
   }
 
   private static String columnSizeFromNode (Node pColumn)
