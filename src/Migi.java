@@ -54,6 +54,7 @@ class Migi
   public static final Integer DEFAULT_HEADER_SIZE = 8;
   public static final Integer DEFAULT_HEADER_SIZE_INDEX = 1;
   public static final Integer BUFFER_HEADER_SIZE = 4;
+  public static final Integer BINARY_BLOB_ID = -1;
 
   public static final String ANSI_RESET = "\u001B[0m";
   public static final String ANSI_GREEN = "\u001B[32m";
@@ -149,7 +150,7 @@ class Migi
       for(int c = 0; c < nNextMigrationListColumns.getLength(); c++)
       {
         int nextMigrationColumnSize = calcColumnSizeFromNode(nNextMigrationListColumns.item(c), (m+1));
-        String nextMigrationColumnID   = calcColumnIDFromNode(nNextMigrationListColumns.item(c), (m+1), c);
+        String nextMigrationColumnID = calcColumnIDFromNode(nNextMigrationListColumns.item(c), (m+1), c);
 
         System.out.println("| <col id=" + nextMigrationColumnID + " />");
 
@@ -167,11 +168,10 @@ class Migi
           Integer latestColumnSize;
           Integer copySize;
 
-          // has size changed?
-          if( currentMigrationColumnSize != nextMigrationColumnSize )
-            latestColumnSize = nextMigrationColumnSize;
-          else
+          if(currentMigrationColumnSize == nextMigrationColumnSize || nextMigrationColumnSize == BINARY_BLOB_ID)
             latestColumnSize = currentMigrationColumnSize;
+          else
+            latestColumnSize = nextMigrationColumnSize;
 
           // allocate memory with the new size (if anything has changed)
           byte [] nextColumnOfBytes = new byte[latestColumnSize];
@@ -591,7 +591,7 @@ class Migi
       int latestColumnSize = calcColumnSizeFromNode(pCurrentListColumns.item(i), mFileIDVersion);
 
       // If we are dealing with a Blob with a Header
-      if(latestColumnSize == -1)
+      if(latestColumnSize == BINARY_BLOB_ID)
       {
         byte [] structBufferHeader = new byte[BUFFER_HEADER_SIZE];
         System.arraycopy(mFileBytes, offset, structBufferHeader, 0, BUFFER_HEADER_SIZE);
@@ -621,7 +621,7 @@ class Migi
   private static Integer parseSizeString (String pColumnSize)
   {
     if(isSizeUndefined(pColumnSize))
-      return -1;
+      return BINARY_BLOB_ID;
     else
       return Integer.parseInt(pColumnSize);
   }
