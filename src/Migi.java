@@ -24,6 +24,9 @@ import org.w3c.dom.NamedNodeMap;
 
 // TODO: write unit test
 
+// javac -d bin src/*.java
+// java -classpath bin Migi -i "bin/super_file.bin" -m "bin/sample_migration.xml"
+
 class Migi
 {
   static String mFilename = "";
@@ -144,13 +147,38 @@ class Migi
       Node nNextMigration = nListMigrations.item(m+1);
       NodeList nNextMigrationListColumns = ((Element)nNextMigration).getElementsByTagName("col");
 
+      Node nCurrentMigration = nListMigrations.item(m);
+      NodeList nCurrentMigrationListColumns = ((Element)nCurrentMigration).getElementsByTagName("col");
+
       calcCurrentMigrationColumnIDs(m);
       calcNextMigrationColumnIDs(m+1);
 
       for(int c = 0; c < nNextMigrationListColumns.getLength(); c++)
       {
-        int nextMigrationColumnSize = calcColumnSizeFromNode(nNextMigrationListColumns.item(c), (m+1));
-        String nextMigrationColumnID = calcColumnIDFromNode(nNextMigrationListColumns.item(c), (m+1), c);
+        int nextMigrationColumnSize = attributeSizeFromNodeOrPastNode(nNextMigrationListColumns.item(c), (m+1));
+        String nextMigrationColumnID = getColumnID(nNextMigrationListColumns.item(c));
+
+        //
+        // Skip children columns //
+        //
+        Node childNode = findNodeByID(nCurrentMigrationListColumns, nextMigrationColumnID);
+
+        // If current migration column is a child
+        if(childNode != null && hasColumnParent(childNode))
+          continue;
+
+        // If next migration column is a child
+        if(hasColumnParent(nNextMigrationListColumns.item(c)))
+          continue;
+
+        //
+        // TODO: Child columns need their own nested processing.
+        //       They need to be able to migrate and move columns inside their own family.
+        // Note: A child should not be made able to move to its parent level. It can only change sibling positions.
+        //       There should be validations to prevent this.
+        //
+        // migrateChildColumns();
+        //
 
         System.out.println("| <col id=" + nextMigrationColumnID + " />");
 
@@ -159,7 +187,7 @@ class Migi
         {
           // get previous migration column and all data associated.
           Integer currentMigrationColumnIndex = mXMLCurrentMigrationColumnIndices.get(nextMigrationColumnID);
-          Integer currentMigrationColumnSize  = mCurrentBufferColumnSizes.get(currentMigrationColumnIndex);
+          Integer currentMigrationColumnSize  = mCurrentBufferColumnSizes.get(currentMigrationColumnIndex + DEFAULT_HEADER_SIZE_INDEX);
           // String  currentMigrationColumnID    = mCurrentBufferColumnIDs.get(currentMigrationColumnIndex);
 
           //-----------------------------------------------------------
@@ -172,6 +200,10 @@ class Migi
             latestColumnSize = currentMigrationColumnSize;
           else
             latestColumnSize = nextMigrationColumnSize;
+
+
+          System.out.println("latestColumnSize = " + latestColumnSize + "\n\n");
+
 
           // allocate memory with the new size (if anything has changed)
           byte [] nextColumnOfBytes = new byte[latestColumnSize];
@@ -296,21 +328,21 @@ class Migi
           // end
           //-----------------------------------------------------------
         }
-/*
-        String superDebuggerString = null;
-        try
-        {
-          superDebuggerString = new String(mNewBufferData.get(c+1), "ASCII");
-        }
-        catch (UnsupportedEncodingException e) { e.printStackTrace(); }
+        /*
+           String superDebuggerString = null;
+           try
+           {
+           superDebuggerString = new String(mNewBufferData.get(c+1), "ASCII");
+           }
+           catch (UnsupportedEncodingException e) { e.printStackTrace(); }
 
-          System.out.println("m-----------------------");
-          System.out.println("mi|   " + mNewBufferColumnIDs.get(c+1));
-          System.out.println("ms|   " + mNewBufferColumnSizes.get(c+1));
-          System.out.println("md|   " + superDebuggerString);
-          System.out.println("mds|   " + superDebuggerString.length());
-          System.out.println("m-----------------------");
-*/
+           System.out.println("m-----------------------");
+           System.out.println("mi|   " + mNewBufferColumnIDs.get(c+1));
+           System.out.println("ms|   " + mNewBufferColumnSizes.get(c+1));
+           System.out.println("md|   " + superDebuggerString);
+           System.out.println("mds|   " + superDebuggerString.length());
+           System.out.println("m-----------------------");
+         */
       } // for(c)
 
       System.out.println("|");
@@ -338,21 +370,21 @@ class Migi
       for(int i = 0; i<mNewBufferData.size(); ++i) {
         fileOuput.write(mNewBufferData.get(i) );
 
-/*
-        String superDebuggerString = null;
+        /*
+           String superDebuggerString = null;
 
-        try
-        {
-          superDebuggerString = new String(mNewBufferData.get(i), "ASCII");
-        }
-        catch (UnsupportedEncodingException e) { e.printStackTrace(); }
+           try
+           {
+           superDebuggerString = new String(mNewBufferData.get(i), "ASCII");
+           }
+           catch (UnsupportedEncodingException e) { e.printStackTrace(); }
 
-          System.out.println("v-------------------------");
-          System.out.println("v--i|   " + mNewBufferColumnIDs.get(i));
-          System.out.println("v--s|   " + mNewBufferColumnSizes.get(i));
-          System.out.println("v--d|   " + superDebuggerString);
-          System.out.println("v-------------------------");
-*/
+           System.out.println("v-------------------------");
+           System.out.println("v--i|   " + mNewBufferColumnIDs.get(i));
+           System.out.println("v--s|   " + mNewBufferColumnSizes.get(i));
+           System.out.println("v--d|   " + superDebuggerString);
+           System.out.println("v-------------------------");
+         */
       }
     }
     catch (IOException e) { e.printStackTrace(); }
@@ -375,8 +407,8 @@ class Migi
 
     for(int c = 0; c < columnList.getLength(); c++)
     {
-      String columnID = calcColumnIDFromNode(columnList.item(c), pMigration, c);
-      int columnSize = calcColumnSizeFromNode(columnList.item(c), pMigration);
+      String columnID = getColumnID(columnList.item(c));
+      int columnSize = attributeSizeFromNodeOrPastNode(columnList.item(c), pMigration);
 
       mXMLCurrentMigrationColumnSizes.put(c, columnSize);
       mXMLCurrentMigrationColumnIDs.put(columnID, pMigration);
@@ -392,8 +424,8 @@ class Migi
 
     for(int c = 0; c < columnList.getLength(); c++)
     {
-      String columnID = calcColumnIDFromNode(columnList.item(c), pMigration, c);
-      int columnSize = calcColumnSizeFromNode(columnList.item(c), pMigration);
+      String columnID = getColumnID(columnList.item(c));
+      int columnSize = attributeSizeFromNodeOrPastNode(columnList.item(c), pMigration);
 
       mXMLNextMigrationColumnSizes.put(c, columnSize);
       mXMLNextMigrationColumnIDs.put(columnID, pMigration);
@@ -487,17 +519,38 @@ class Migi
 
       for(int c = 0; c < columnList.getLength(); c++)
       {
-        String columnID = calcColumnIDFromNode(columnList.item(c), m, c);
+        Node node = columnList.item(c);
 
+        //
+        // Ensure Column ID is present //
+        //
+        NamedNodeMap attrs = node.getAttributes();
+        Node nColumnID = attrs.getNamedItem("id");
+
+        if(nColumnID == null)
+          migiComplainAndExit("Validation Error - Column <col> tag missing a 'id=' attribute." + "\nProblem migration: " + (m+1) + "\nProblem column: " + (c+1) );
+
+        String columnID = nColumnID.getTextContent();
+
+        //
+        // Ensure parent columns do not have a numeric 'size' attribute. (only undefined)
+        //
+        if (columnHasChildren(node) && attributeSizeFromNodeOrPastNode(node, m) != BINARY_BLOB_ID)
+          migiComplainAndExit("Error - Column ID: '" + columnID + "' has a 'size=' numeric value with children!\nParent columns cannot have a numeric 'size' attribute.\nTry 'size=?' or 'size=#'");
+
+        //
         // Ensure no duplicate columns in a single migration
+        //
         if(columnIDs.get(columnID) == null)
           columnIDs.put(columnID, c);
         else
-          migiComplainAndExit("Error - More than one <col> tag contains the same 'id=' attribute value inside a single migration." + "\nProblem migration: " + (m+1) + "\nProblem column: " + (c+1) + "\nProblem id: " + columnID );
+          migiComplainAndExit("Validation Error - More than one <col> tag contains the same 'id=' attribute value inside a single migration." + "\nProblem migration: " + (m+1) + "\nProblem column: " + (c+1) + "\nProblem id: " + columnID );
 
+        //
         // Ensure no columnID matches HEADER_ID
+        //
         if( HEADER_ID.equals(columnID) )
-          migiComplainAndExit("Error - Column <col> tag contains an 'id=' with value: " + HEADER_ID + " which is a reserved word." + "\nProblem migration: " + (m+1) + "\nProblem column: " + (c+1) + "\nProblem id: " + columnID );
+          migiComplainAndExit("Validation Error - Column <col> tag contains an 'id=' with value: " + HEADER_ID + " which is a reserved word." + "\nProblem migration: " + (m+1) + "\nProblem column: " + (c+1) + "\nProblem id: " + columnID );
       }
     }
   }
@@ -540,8 +593,8 @@ class Migi
 
       for(int c = 0; c < columnList.getLength(); c++)
       {
-        int columnSize = calcColumnSizeFromNode(columnList.item(c), pCurrentMigration);
-        String columnID   = calcColumnIDFromNode(columnList.item(c), m, c);
+        int columnSize = attributeSizeFromNodeOrPastNode(columnList.item(c), pCurrentMigration);
+        String columnID   = getColumnID(columnList.item(c));
 
         if(mXMLCurrentMigrationColumnIDs.containsKey(columnID))
           if(mXMLCurrentMigrationColumnIDs.get(columnID) == m)
@@ -567,8 +620,8 @@ class Migi
 
     for(int c = 0; c < columnList.getLength(); c++)
     {
-      int columnSize = calcColumnSizeFromNode(columnList.item(c), pMigration);
-      String columnID   = calcColumnIDFromNode(columnList.item(c), pMigration, c);
+      int columnSize = attributeSizeFromNodeOrPastNode(columnList.item(c), pMigration);
+      String columnID   = getColumnID(columnList.item(c));
       Integer columnIndex = c;
 
       if(mXMLCurrentMigrationColumnIDs.containsKey(columnID))
@@ -587,23 +640,23 @@ class Migi
 
     for(int i = 0; i < pCurrentListColumns.getLength(); i++)
     {
-      String columnID = calcColumnIDFromNode(pCurrentListColumns.item(i), mFileIDVersion, i);
-      int latestColumnSize = calcColumnSizeFromNode(pCurrentListColumns.item(i), mFileIDVersion);
+      Node currentNode = pCurrentListColumns.item(i);
+      String columnID = getColumnID(currentNode);
 
-      // If we are dealing with a Blob with a Header
-      if(latestColumnSize == BINARY_BLOB_ID)
-      {
-        byte [] structBufferHeader = new byte[BUFFER_HEADER_SIZE];
-        System.arraycopy(mFileBytes, offset, structBufferHeader, 0, BUFFER_HEADER_SIZE);
+      // Child columns should eventually be calculated in their own Family[] hash.
+      // TODO: method chunkFamilyColumns
+      //
+      // Skip children columns (making them act like a binary blob)
+      if(hasColumnParent(currentNode))
+        continue;
 
-        int sizeBuffer = bytesToInt32(structBufferHeader);
-        latestColumnSize = sizeBuffer + BUFFER_HEADER_SIZE;
-
-        // migiComplainAndExit("TODO " + latestColumnSize); // TODO:
-      }
+      int latestColumnSize = columnFamilySize(currentNode, mFileIDVersion, offset);
 
       byte [] columnOfBytes = new byte[latestColumnSize];
       System.arraycopy(mFileBytes, offset, columnOfBytes, 0, latestColumnSize);
+
+      // System.out.println("<" + columnID + ">" + "  column index c = " + (i + DEFAULT_HEADER_SIZE_INDEX));
+      // System.out.println("latestColumnSize = " + latestColumnSize);
 
       mCurrentBufferData.put((i+DEFAULT_HEADER_SIZE_INDEX), columnOfBytes);
       mCurrentBufferColumnIDs.put((i+DEFAULT_HEADER_SIZE_INDEX), columnID);
@@ -613,36 +666,84 @@ class Migi
     }
   }
 
-  private static boolean isSizeUndefined (String pColumnSize)
+  private static Integer columnFamilySize (Node pParentNode, Integer mFileIDVersion, Integer pOffset)
   {
-    return (pColumnSize.charAt(0) == '#' || pColumnSize.charAt(0) == '?');
+    Integer latestColumnSize = 0;
+
+    if (columnHasChildren(pParentNode))
+    {
+      NodeList children = pParentNode.getChildNodes();
+
+      for (int i = 0; i < children.getLength(); i++)
+      {
+        Node child = children.item(i);
+
+        if (child.getNodeType() != Node.ELEMENT_NODE)
+          continue;
+
+        latestColumnSize += columnFamilySize(child, mFileIDVersion, (pOffset + latestColumnSize));
+      }
+    }
+    else // when no children
+    {
+      latestColumnSize = attributeSizeFromNodeOrPastNode(pParentNode, mFileIDVersion);
+
+      if(latestColumnSize == BINARY_BLOB_ID)
+        latestColumnSize = getBlobSize(pOffset);
+    }
+
+    return latestColumnSize;
   }
 
-  private static Integer parseSizeString (String pColumnSize)
+  private static boolean columnHasChildren (Node pNode)
   {
-    if(isSizeUndefined(pColumnSize))
-      return BINARY_BLOB_ID;
-    else
-      return Integer.parseInt(pColumnSize);
+    NodeList children = pNode.getChildNodes();
+
+    if(children.getLength() == 0)
+      return false;
+
+    for(int i = 0; i < children.getLength(); i++)
+      if(children.item(i).getNodeType() == Node.ELEMENT_NODE)
+        return true;
+
+    return false;
   }
 
-  private static int bytesToInt32(byte [] bytes)
+  private static boolean hasColumnParent (Node pNode)
   {
-    return (
-      ((bytes[0] & 0xff))       |
-      ((bytes[1] & 0xff) << 8)  |
-      ((bytes[2] & 0xff) << 16) |
-      ((bytes[3] & 0xff) << 24)
-    );
+    Node parent = pNode.getParentNode();
+
+    if(parent == null)
+      return false;
+
+    return parent.getNodeName().equals("col");
   }
 
-  private static int calcColumnSizeFromNode (Node pColumn, int pMigrationNumber)
+  private static Node findNodeByID (NodeList pNodeList, String pID)
   {
-    String columnID = calcColumnIDFromNode(pColumn, pMigrationNumber, 0);
-    String columnSize = columnSizeFromNode(pColumn);
+    for(int n = 0; n < pNodeList.getLength(); n++)
+    {
+      Node node = pNodeList.item(n);
 
-    if(columnSize != null)
-      return parseSizeString(columnSize);
+      if(node.getNodeType() != Node.ELEMENT_NODE)
+        continue;
+
+      if(getColumnID(node).equals(pID))
+        return node;
+    }
+
+    return null;
+  }
+
+  private static int attributeSizeFromNodeOrPastNode (Node pColumn, int pMigrationNumber)
+  {
+    String columnID = getColumnID(pColumn);
+    NamedNodeMap mapAttrs = pColumn.getAttributes();
+    Node nColumnSize = mapAttrs.getNamedItem("size");
+    String columnSize = null;
+
+    if(nColumnSize != null)
+      return parseSizeString(nColumnSize.getTextContent().trim());
 
     // search through all the migrations and log the latest size for the specific columnID
     // up to the current migration
@@ -657,36 +758,59 @@ class Migi
       for(int c = 0; c < columnList.getLength(); c++)
       {
         Node nextColumn = columnList.item(c);
-        String nextColumnID = calcColumnIDFromNode(columnList.item(c), m, c);
-        String nextColumnSize = columnSizeFromNode(nextColumn);
+        String nextColumnID = getColumnID(columnList.item(c));
+        String nextColumnSize = getSizeString(nextColumn);
 
-        if( (new String(columnID).equals(nextColumnID) ) && nextColumnSize != null )
+        if( (new String(columnID).equals(nextColumnID)) && nextColumnSize != null )
           columnSize = nextColumnSize;
       }
     }
 
     if(columnSize == null)
-      migiComplainAndExit("Error - Column <col> ID: " + columnID + " was never assigned a size= attribute in any migration.");
+      migiComplainAndExit("Error - Column <col> ID: " + columnID + " was never assigned a size= attribute in a migration.");
 
     return parseSizeString(columnSize);
   }
 
-  private static String columnSizeFromNode (Node pColumn)
+  private static Integer getBlobSize (Integer pOffset)
   {
-    NamedNodeMap ColumnAttrs = pColumn.getAttributes();
-    Node ColumnSize = ColumnAttrs.getNamedItem("size");
-    return (ColumnSize == null) ? null : ColumnSize.getTextContent().trim();
+    byte [] structBufferHeader = new byte[BUFFER_HEADER_SIZE];
+    System.arraycopy(mFileBytes, pOffset, structBufferHeader, 0, BUFFER_HEADER_SIZE);
+
+    Integer sizeBuffer = bytesToInt32(structBufferHeader);
+    return (sizeBuffer + BUFFER_HEADER_SIZE);
   }
 
-  private static String calcColumnIDFromNode (Node pColumn, int pMigrationNumber, int pColumnNumber)
+  private static Integer parseSizeString (String pColumnSize)
   {
-    NamedNodeMap mapAttrs = pColumn.getAttributes();
-    Node nColumnID = mapAttrs.getNamedItem("id");
+    if(isSizeUndefined(pColumnSize))
+      return BINARY_BLOB_ID;
+    else
+      return Integer.parseInt(pColumnSize);
+  }
 
-    if(nColumnID == null)
-      migiComplainAndExit("Error - Column <col> tag missing a 'id=' attribute." + "\nProblem migration: " + (pMigrationNumber+1) + "\nProblem column: " + (pColumnNumber+1) );
+  private static boolean isSizeUndefined (String pColumnSize)
+  {
+    return (pColumnSize.charAt(0) == '#' || pColumnSize.charAt(0) == '?');
+  }
 
-    return nColumnID.getTextContent();
+  private static int bytesToInt32(byte [] bytes)
+  {
+    return (
+      ((bytes[0] & 0xff))       |
+      ((bytes[1] & 0xff) << 8)  |
+      ((bytes[2] & 0xff) << 16) |
+      ((bytes[3] & 0xff) << 24)
+    );
+  }
+
+  private static String getSizeString (Node pColumn) { return getAttribute (pColumn, "size"); }
+  private static String getColumnID (Node pColumn) { return getAttribute (pColumn, "id"); }
+  private static String getAttribute (Node pColumn, String pAttribute)
+  {
+    NamedNodeMap ColumnAttrs = pColumn.getAttributes();
+    Node ColumnSize = ColumnAttrs.getNamedItem(pAttribute);
+    return (ColumnSize == null) ? null : ColumnSize.getTextContent().trim();
   }
 
   private static Integer initCurrentBufferHeader ()
@@ -708,8 +832,8 @@ class Migi
 
   private static String migiHelperMessage () {
     return "Usage and commands: \n"
-        + "migi -i input_file -m migration_directory \n"
-        + "migi -i input_file -m migration_file \n";
+      + "migi -i input_file -m migration_directory \n"
+      + "migi -i input_file -m migration_file \n";
   }
 
   public static Object getHashMapKeyFromValue(HashMap hm, Object value)
@@ -746,37 +870,3 @@ class Migi
   }
 
 } // class Migi //
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
