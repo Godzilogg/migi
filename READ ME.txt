@@ -1,0 +1,83 @@
+=================================
+      Migi - What is it?
+=================================
+Def:
+
+  Migi is a mini migration utility for binary files.
+  Its name comes from the Mikoyan MiG-29 twin-engine jet fighter aircraft,
+  first flown 7 years after the unix epoch.
+
+  Try a sample:
+  Basic Usage:
+
+    java Migi -i "sample_migration.nes" -m "sample_migration.xml"
+
+  Which will migrate the file, set data defaults and produce a new file with the changes: sample_migration.nes.mig.bin
+
+  To do the same, and overwrite the binary file with the new data:
+
+    java Migi -r -i "sample_migration.nes" -m "sample_migration.xml"
+
+  To migrate backwards, simply reverse the order of migration steps in the XML, then re-run migration.
+
+=================================
+Under-da-hood:
+
+  Every binary file using this migration system, must prefix their data with a header.
+
+  ['R','A','D',0x00] + ['M','i','G',0x1D] // 1D in hex is 29 in decimal, referencing the MiG29.
+
+  The version number is the RAD's 0x00. In most cases, if not all cases, these 8 bytes are completely useless but are expected by the Migi program.
+
+
+=================================
+Compiling:
+
+  Ensure you have at least javac version: javac 1.8.0_77
+
+  cd /Users/photon/Code_scraps_code/basics/ebi/migi
+  javac -d bin src/*.java
+
+  # test run with:
+  java -classpath bin Migi -i "bin/sample_migration.nes" -m "bin/sample_migration.xml"
+  OR
+  java -classpath bin Migi -i "bin/super_file.bin" -m "bin/sample_migration.xml"
+
+
+=============================================================================
+
+Spec TODO:
+
+1
+--------------------------------------------
+
+Test that this happens: Exiting - There is only one <CBA> block </CBA> migration. Cannot migrate forward.
+<migration>
+  <CBA>
+    <col id="ID" size="4"> 0x99770077 </col>
+    <col id="SizeOfName + Name" size="?" __id="Name" __size="333" __shouldbesize="337"/>
+    <col id="Count" size="4"/>
+      <col id="id1" size="4"/>
+      <col id="offset1" size="4"/>
+      <col id="id2" size="4"/>
+      <col id="offset2" size="4"/>
+  </CBA>
+</migration>
+
+2
+--------------------------------------------
+
+# Test that other thiandsalfslakdfjlkj.. Change the File Version to 64 and ensure that it gives the error:
+
+Error - There is no Migration for file Version: 64
+Hint: CBA with version 0x00 would migrate the file from the first migration block to the last migration block.
+Starting the file version at 0x01 would assume the file's binary was already migrated to the first migration, and would proceed onwards from that block.
+(It would skip the first migration block.)
+
+3
+--------------------------------------------
+
+
+
+
+
