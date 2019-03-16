@@ -25,7 +25,7 @@ import org.w3c.dom.NamedNodeMap;
 // TODO: write unit test
 
 // javac -d bin src/*.java
-// java -classpath bin Migi -i "bin/super_file.bin" -m "bin/sample_migration.xml"
+// java -classpath bin Migi -i "test/super_file.bin" -m "test/sample_migration.xml"
 
 class Migi
 {
