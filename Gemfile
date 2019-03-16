@@ -11,6 +11,8 @@ source 'https://rubygems.org'
 # gem 'nokogiri', :git => 'https://github.com/tenderlove/nokogiri.git', :branch => '1.4'
 #
 gem 'nokogiri', '=1.10.1'
+gem 'pry', '=0.12.2'
+gem 'super-color', '=0.1.3'
 
 #
 # jruby -S bundle
