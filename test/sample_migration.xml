@@ -1,0 +1,45 @@
+<migration>
+  <CBA>
+    <col id="ID" size="4"/>
+    <col id="SizeOfName + Name" size="?" __id="Name" __size="333" __shouldbesize="337"/>
+    <col id="Count + Array of Structures" count="?" size="?" count_would_compute_to_2="2">
+      <col id="id" size="4"/>
+      <col id="offset" size="4"/>
+    </col>
+  </CBA>
+
+  <CBA>
+    <col id="ID" size="4"/>
+    <col id="SizeOfName + Name" size="?" __id="Name" __size="333" __shouldbesize="337"/>
+    <col id="Count" size="4"/>
+      <col id="id1" size="4"/>
+      <col id="offset1" size="4"/>
+      <col id="id2" size="4"/>
+      <col id="offset2" size="4"/>
+  </CBA>
+  <CBA>
+    <col id="ID" size="4"/>
+    <col id="SizeOfName + Name" size="?" __id="Name" __size="333" __shouldbesize="337"/>
+    <col id="Count" size="4"/>
+      <col id="id1" size="4"/>
+      <col id="offset1" size="4"/>
+      <col id="id2" size="4"/>
+      <col id="offset2" size="4"/>
+  </CBA>
+  <CBA>
+    <col id="ID" size="4"/>
+    <col id="SizeOfName + Name" size="?" __id="Name" __size="333" __shouldbesize="337"/>
+    <col id="Count + Array of Structures" count="?" size="?" count_would_compute_to_2="2">
+      <col id="id" size="4"/>
+      <col id="offset" size="4"/>
+    </col>
+  </CBA>
+  <CBA>
+    <col id="ID" size="4"/>
+    <col id="SizeOfName + Name" size="?" __id="Name" __size="333" __shouldbesize="337"/>
+    <col id="Count + Array of Structures" count="2" size="?" size_would_compute_to="8">
+      <col id="id" size="4"/>
+      <col id="offset" size="4"/>
+    </col>
+  </CBA>
+</migration>

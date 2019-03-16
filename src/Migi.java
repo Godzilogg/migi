@@ -27,6 +27,8 @@ import org.w3c.dom.NamedNodeMap;
 // javac -d bin src/*.java
 // java -classpath bin Migi -i "test/super_file.bin" -m "test/sample_migration.xml"
 
+// javac -d bin src/*.java && java -classpath bin Migi -i "test/super_file.bin" -m "test/sample_migration.xml"
+
 class Migi
 {
   static String mFilename = "";
@@ -67,9 +69,9 @@ class Migi
   // main ( String [] args )
   //
   // To run open up your terminal and type:
-  //      java Migi -i "file.fun.bin" -m "C:\MyMigrations\FunMigration.xml"
+  //      java -classpath bin Migi -i "test/super_file.bin" -m "test/sample_migration.xml"
   // to overwrite file:
-  //      java Migi -r -i "file.fun.bin" -m "C:\MyMigrations\FunMigration.xml"
+  //      java -classpath bin Migi -r -i "test/super_file.bin" -m "test/sample_migration.xml"
   //
   public static void main ( String [] args )
   {
