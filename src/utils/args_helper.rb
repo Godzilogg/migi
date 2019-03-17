@@ -5,7 +5,6 @@ class ArgsHelper
     :input_files_directory,
     :migration_filepath
 
-  # TODO: error when not given a command
   RECOGNIZED_PARAMS = %w(-i -d -m)
 
   def initialize
