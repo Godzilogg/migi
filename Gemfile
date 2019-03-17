@@ -20,6 +20,6 @@ gem 'super-color', '=0.1.3'
 # jirb
 #
 
-# export JRUBY_HOME=/home/photon/Downloads/jruby-9.2.6.0
+# export JRUBY_HOME=~/Downloads/jruby-9.2.6.0
 # export JRUBY_HOME=$(pwd)
 # export PATH=$PATH:$JRUBY_HOME/bin
