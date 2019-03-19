@@ -3,6 +3,7 @@ ruby '2.3.1'
 
 # TODO: Windows runs:
 # ruby '2.5.0', :engine => 'jruby', :engine_version => '9.2.5.0'
+# rvm install ruby-2.5.3
 
 source 'https://rubygems.org'
 
