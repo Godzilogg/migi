@@ -1,2 +1,2 @@
 # migi
-Migration system for quick and dirty binary files.
+.Migration system for quick and dirty binary files.
